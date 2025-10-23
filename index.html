@@ -20,8 +20,12 @@
   }
 }
 </script>
+    <!-- Add Babel for in-browser JSX/TSX transformation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
   <body class="bg-[#181a20]">
     <div id="root"></div>
+    <!-- Load and transform the main application script -->
+    <script type="text/babel" data-type="module" src="./index.tsx"></script>
   </body>
 </html>
