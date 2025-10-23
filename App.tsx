@@ -352,27 +352,38 @@ const App: React.FC = () => {
           executionStepsRef.current = [];
           return;
       }
-      const { steps, problems: compileProblems } = parseCode(codeToParse, fs);
-      
-      setProblems(compileProblems);
-      executionStepsRef.current = steps;
+      try {
+        const { steps, problems: compileProblems } = parseCode(codeToParse, fs);
+        
+        setProblems(compileProblems);
+        executionStepsRef.current = steps;
 
-      const previewState = produce(initialGameState, draft => {
-        for (const step of steps) {
-            if (step.type === 'CREATE_SPRITE') draft.sprites.push(step.sprite);
-            if (step.type === 'CREATE_PROP') draft.props.push(step.prop);
-            if (step.type === 'SET_BACKGROUND') draft.worldState.backgroundColor = step.color;
-            if (step.type === 'CREATE_ZONE') draft.worldState.zones.push(step.zone);
-            if (step.type === 'CREATE_NETWORK') {
-                const sprite = draft.sprites.find(s => s.id === step.spriteId);
-                if (sprite) sprite.brain = { rewards: 0 };
-            }
+        const previewState = produce(initialGameState, draft => {
+          for (const step of steps) {
+              if (step.type === 'CREATE_SPRITE') draft.sprites.push(step.sprite);
+              if (step.type === 'CREATE_PROP') draft.props.push(step.prop);
+              if (step.type === 'SET_BACKGROUND') draft.worldState.backgroundColor = step.color;
+              if (step.type === 'CREATE_ZONE') draft.worldState.zones.push(step.zone);
+              if (step.type === 'CREATE_NETWORK') {
+                  const sprite = draft.sprites.find(s => s.id === step.spriteId);
+                  if (sprite) sprite.brain = { rewards: 0 };
+              }
+          }
+        });
+        setGameState(previewState);
+
+        if (compileProblems.length > 0 && activeOutputTabId !== 'guide') {
+          setActiveOutputTabId('problems');
         }
-      });
-      setGameState(previewState);
-
-      if (compileProblems.length > 0 && activeOutputTabId !== 'guide') {
-        setActiveOutputTabId('problems');
+      } catch (e) {
+          console.error("Critical error during code parsing:", e);
+          const errorMessage = e instanceof Error ? e.message : "An unknown parsing error occurred.";
+          setProblems([{ line: 0, message: `Fatal Parser Error: ${errorMessage}` }]);
+          setGameState(initialGameState);
+          executionStepsRef.current = [];
+          if (activeOutputTabId !== 'guide') {
+            setActiveOutputTabId('problems');
+          }
       }
   }, 500);
 

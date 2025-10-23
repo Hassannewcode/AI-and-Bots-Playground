@@ -1,11 +1,5 @@
+
 import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-
-// We are assuming the API_KEY is provided via environment variables.
-if (!process.env.API_KEY) {
-    console.error("API_KEY is not set. Please set it in your environment variables.");
-}
 
 const model = 'gemini-2.5-flash';
 
@@ -16,7 +10,15 @@ export const getGeminiResponse = async (
     newMessage: string,
     systemInstruction: string = "You are a helpful assistant."
 ): Promise<string> => {
+    if (!process.env.API_KEY) {
+        const errorMsg = "API_KEY is not configured. Please set it in your environment variables.";
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+    }
+
     try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+
         const contents = [
             ...history,
             {
@@ -42,8 +44,8 @@ export const getGeminiResponse = async (
     } catch (error) {
         console.error("Error calling Gemini API:", error);
         if (error instanceof Error) {
-            return `Sorry, I encountered an error: ${error.message}`;
+            throw error; // Re-throw the original error to be caught by the caller
         }
-        return "Sorry, I encountered an unknown error.";
+        throw new Error("An unknown error occurred while calling the Gemini API.");
     }
 };
