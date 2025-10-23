@@ -1,0 +1,5 @@
+{
+  "name": "AI and Bots Playground",
+  "description": "A static, visual clone of the Codingame IDE layout, focusing purely on the placement and color scheme of UI panels using Tailwind CSS. This is a non-functional replica for layout demonstration purposes.",
+  "requestFramePermissions": []
+}
