@@ -247,14 +247,30 @@ export function parseUniversalCode(code: string, fileSystem: FileSystemTree): Om
             const printMatch = trimmedLine.match(/^(?:print|console\.log)\((.*)\)$/);
             if(printMatch) {
                 let message = printMatch[1];
-                message = message.replace(/\{([\w\s.\[\]"']+)\}/g, (_, expression) => { // f-string/template literal
-                     const [varName, prop] = expression.trim().split('.');
-                     const sprite = variables.get(varName);
-                     if (!sprite) return `{${expression}}`;
-                     // FIX: 'match' is not defined. Fallback to the original expression placeholder.
-                     return String(sprite[prop as keyof UniversalSprite] ?? `{${expression}}`);
+                // This new regex handles both ${js} and {python} style interpolations
+                message = message.replace(/\$\{([^}]+)\}|\{([^}]+)\}/g, (_, jsExpression, pyExpression) => {
+                    const expression = (jsExpression || pyExpression || '').trim();
+                    if (!expression) return '';
+
+                    const [varName, prop] = expression.split('.');
+
+                    const sprite = variables.get(varName);
+                    
+                    if (!sprite || !prop) {
+                        // Return original if variable/property structure is wrong
+                        return jsExpression !== undefined ? `\${${expression}}` : `{${expression}}`;
+                    }
+
+                    const value = sprite[prop as keyof UniversalSprite];
+
+                    // Return original if property doesn't exist on sprite, otherwise return value
+                    return value !== undefined ? String(value) : (jsExpression !== undefined ? `\${${expression}}` : `{${expression}}`);
                 });
-                steps.push({ type: 'LOG', message: message.replace(/^["'`]|["'`]$/g, ''), duration: 0 });
+                
+                // Use a more robust regex to strip optional 'f' prefixes and matching quotes/backticks.
+                // If no quotes are found, it returns the original message.
+                const finalMessage = message.replace(/^f?(["'`])([\s\S]*?)\1$/, '$2');
+                steps.push({ type: 'LOG', message: finalMessage, duration: 0 });
                 continue;
             }
             
