@@ -1,35 +1,35 @@
 
+
 import React from 'react';
-import { AIGuide } from './api/AIGuide';
-import { WorldGuide } from './api/WorldGuide';
-import { PhysicsGuide } from './api/PhysicsGuide';
-import { SoundGuide } from './api/SoundGuide';
-import { NeuronsGuide } from './api/NeuronsGuide';
-import { GuideSection, CodeLine } from './api/SharedComponents';
 
 export const UniversalGuide: React.FC = () => (
-     <div className="text-gray-400 space-y-5 p-1">
-        <div className="p-3 bg-slate-800 rounded-md mb-6 border border-slate-700">
+    <div className="text-gray-400 space-y-5 p-1 font-sans">
+        <div className="p-3 bg-slate-800 rounded-md border border-slate-700">
              <h2 className="font-bold text-white font-sans text-base mb-1">Universal Engine Guide</h2>
-             <p className="text-slate-300 font-sans text-xs">This engine uses a universal API that works in any language. The parser looks for the command structure (e.g., `ai.Sprite(...)`), not specific language syntax. <br/><strong class="text-white">You must import libraries before using them.</strong></p>
+             <p className="text-slate-300 font-sans text-xs">This IDE allows you to control sprites using different programming languages and build your world with HTML.</p>
         </div>
-        
-        <GuideSection title="Setup & Imports">
-            <CodeLine comment="The engine uses a universal import syntax.">
-                <span className="token-keyword">import</span> ai, world
-            </CodeLine>
-        </GuideSection>
-
-        <GuideSection title="Printing to Console">
-             <CodeLine comment="Use your language's standard print function.">
-                print(<span className="token-string">"Hello, Console!"</span>)
-            </CodeLine>
-        </GuideSection>
-        
-        <AIGuide />
-        <WorldGuide />
-        <PhysicsGuide />
-        <SoundGuide />
-        <NeuronsGuide />
+         <div className="p-3">
+            <h3 className="font-bold text-teal-400 mb-2">How It Works</h3>
+            <ol className="list-decimal list-inside text-xs space-y-3">
+                <li>
+                    <span className="font-semibold text-white">Design Your World in HTML:</span>
+                    <p className="text-slate-400 mt-1 pl-2">
+                        Open <code className="bg-slate-700 text-white px-1 rounded">world.html</code>. Add `div` elements with `class="prop"` to create static objects like walls and rocks. Use `data-shape` and inline `style` attributes to define their appearance and position.
+                    </p>
+                </li>
+                <li>
+                     <span className="font-semibold text-white">Script Sprites in Python or JS:</span>
+                     <p className="text-slate-400 mt-1 pl-2">
+                        Select a code file (e.g., <code className="bg-slate-700 text-white px-1 rounded">main.py</code> or a `.js` file). The guide will automatically update to show you the correct syntax for scripting sprite behavior.
+                    </p>
+                </li>
+                 <li>
+                     <span className="font-semibold text-white">Run the Simulation:</span>
+                     <p className="text-slate-400 mt-1 pl-2">
+                        Click "Run This File" to see your world and sprites come to life. The engine first builds the world from your HTML, then executes your script.
+                    </p>
+                </li>
+            </ol>
+        </div>
     </div>
 );

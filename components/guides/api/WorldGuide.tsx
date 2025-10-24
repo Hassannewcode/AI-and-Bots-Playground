@@ -6,8 +6,11 @@ export const WorldGuide: React.FC = () => (
         <CodeLine comment="Sets the background color of the simulation panel using a hex code.">
             world.set_background(color=<span className="token-string">"#0f172a"</span>)
         </CodeLine>
-        <CodeLine comment="Creates a named, colored zone on the map. Sprites can interact with zones in future updates.">
-            world.create_zone(name=<span className="token-string">"goal"</span>, x=<span className="token-number">85</span>, y=<span className="token-number">90</span>, width=<span className="token-number">10</span>, height=<span className="token-number">10</span>, color=<span className="token-string">"#10b981"</span>)
-        </CodeLine>
+         <div className="text-xs font-sans p-2 bg-slate-800/50 rounded-md border border-slate-700">
+            <p className="font-bold text-slate-300">Defining Props (Walls, Rocks)</p>
+            <p className="mt-1 text-slate-400">
+                Static props are now defined declaratively in the <code className="bg-slate-900 text-white px-1 rounded-sm">world.html</code> file. Add `div` elements with the class `prop` and use `data-shape` and inline styles to configure them.
+            </p>
+        </div>
     </GuideSection>
 );

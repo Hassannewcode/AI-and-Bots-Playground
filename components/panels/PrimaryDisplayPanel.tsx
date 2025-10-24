@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import type { GameState, Sprite } from '../../game/types';
 import { getIconForShape, SpeakerWaveIcon, SpeakerXMarkIcon, ShareIcon, ArrowsPointingOutIcon } from '../icons';
@@ -50,22 +51,6 @@ export const PrimaryDisplayPanel: React.FC<PrimaryDisplayPanelProps> = ({
     return (
       <div id="game-panel" className="flex-grow bg-[#272a33] rounded-lg flex flex-col border border-[#3a3d46]">
         <div className="flex-grow m-1 rounded-sm relative overflow-hidden" style={{ backgroundColor: gameState.worldState.backgroundColor }}>
-            {gameState.worldState.zones.map(zone => (
-                <div
-                    key={zone.id}
-                    className="absolute"
-                    style={{
-                        left: `${zone.x}%`,
-                        top: `${zone.y}%`,
-                        width: `${zone.width}%`,
-                        height: `${zone.height}%`,
-                        backgroundColor: `${zone.color}40`, // Add alpha for transparency
-                        border: `1px solid ${zone.color}`,
-                        transform: 'translate(-50%, -50%)',
-                    }}
-                    title={zone.name}
-                />
-            ))}
             {gameState.effects.map(effect => {
                 if (effect.type === 'soundwave') {
                     const progress = (Date.now() - effect.creationTime) / effect.duration;
@@ -96,7 +81,6 @@ export const PrimaryDisplayPanel: React.FC<PrimaryDisplayPanelProps> = ({
                         width: `${prop.width}%`,
                         height: `${prop.height}%`,
                         transform: 'translate(-50%, -50%)',
-                        backgroundColor: prop.color || '#64748b', // bg-slate-500
                         ...prop.styles,
                     }}
                     title={prop.shape}

@@ -1,3 +1,4 @@
+
 // Simple HTML escape to prevent any user-inputted HTML from being rendered.
 const escapeHtml = (text: string): string => {
     return text.replace(/[&<>"']/g, (match) => {
@@ -20,21 +21,6 @@ const highlightWithRegex = (code: string, regex: RegExp, replacements: (match: R
         const match = args.slice(0, -2); // The last two args are offset and string
         const result = replacements(match as unknown as RegExpExecArray);
         return result !== null ? result : match[0];
-    });
-};
-
-const highlightSpriteScript = (code: string): string => {
-    const regex = /(\bimport\b|\bai\b)|(#.*)|("([^"]*)"|'([^']*)')|(\.[\w_]+)|(\w+(?=\s*=))|(\b\d+\.?\d*\b)|(\b\w+(?=\s*\=))/g;
-    return highlightWithRegex(code, regex, (match) => {
-        const [full, keyword, comment, str, _strDouble, _strSingle, method, param, number, variable] = match;
-        if (keyword) return `<span class="token-keyword">${keyword}</span>`;
-        if (comment) return `<span class="token-comment">${comment}</span>`;
-        if (str) return `<span class="token-string">${str}</span>`;
-        if (method) return `<span class="token-method">${method}</span>`;
-        if (param) return `<span class="token-parameter">${param}</span>`;
-        if (number) return `<span class="token-number">${number}</span>`;
-        if (variable) return `<span class="token-variable">${variable}</span>`;
-        return null;
     });
 };
 
@@ -80,6 +66,19 @@ const highlightHTML = (code: string): string => {
     });
 }
 
+const highlightCStyle = (code: string): string => {
+    const regex = /(\b(?:if|else|while|for|return|int|float|double|char|void|struct|class|public|private|protected|static|const|using|namespace|#include)\b)|(\/\/.*|\/\*[\s\S]*?\*\/)|("([^"]*)")|(\b\d+\.?\d*f?\b)|(\b\w+(?=\s*\())/g;
+     return highlightWithRegex(code, regex, (match) => {
+        const [full, keyword, comment, str, _, number, func] = match;
+        if (keyword) return `<span class="token-keyword">${keyword}</span>`;
+        if (comment) return `<span class="token-comment">${comment}</span>`;
+        if (str) return `<span class="token-string">${str}</span>`;
+        if (number) return `<span class="token-number">${number}</span>`;
+        if (func) return `<span class="token-function">${func}</span>`;
+        return null;
+    });
+};
+
 const highlightGeneric = (code: string): string => {
     // Basic highlighting for comments, strings, and numbers
     const regex = /(#.*|\/\/.*|--.*)|("([^"]*)"|'([^']*)')|(\b\d+\.?\d*\b)/g;
@@ -94,8 +93,6 @@ const highlightGeneric = (code: string): string => {
 
 export const highlightCode = (code: string, language: string): string => {
     switch (language) {
-        case 'ai':
-            return highlightSpriteScript(code);
         case 'py':
             return highlightPython(code);
         case 'js':
@@ -105,9 +102,17 @@ export const highlightCode = (code: string, language: string): string => {
             return highlightJS(code);
         case 'html':
             return highlightHTML(code);
+        case 'cpp':
+        case 'c':
+        case 'cs':
+        case 'java':
+        case 'go':
+        case 'rs':
+             return highlightCStyle(code);
         case 'md':
         case 'txt':
         case 'bat':
+        case 'sh':
         default:
             return highlightGeneric(code);
     }

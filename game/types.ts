@@ -62,8 +62,11 @@ export interface GameState {
 }
 
 export interface Problem {
+  fileId: string;
   line: number;
   message: string;
+  code: string;
+  language: string;
 }
 
 // Defines a single operation for the runner to execute
@@ -87,10 +90,9 @@ export type ExecutionStep =
   | { type: 'PLAY_SOUND', x: number, y: number, duration: 0 }
   // World Building
   | { type: 'SET_BACKGROUND', color: string, duration: 0 }
-  | { type: 'CREATE_ZONE', zone: Zone, duration: 0 }
-  // AI & Neurons
-  | { type: 'CREATE_NETWORK', spriteId: string, duration: 0 }
-  | { type: 'REWARD_SPRITE', spriteId: string, value: number, duration: 0 }
+  // AI & Neurons (now part of Sprite)
+  | { type: 'SPRITE_CREATE_NETWORK', spriteId: string, duration: 0 }
+  | { type: 'SPRITE_REWARD', spriteId: string, value: number, duration: 0 }
   | { type: 'GO_TO', spriteId: string, x: number, y: number, duration: number };
 
 
@@ -105,9 +107,17 @@ export interface ExecutionResult {
 
 // File System Types
 export type FileSystemNode = 
-  | { id: string; name: string; type: 'file'; parentId: string; code: string; }
-  | { id: string; name: string; type: 'folder'; parentId?: string; children: string[] };
+  | { id: string; name: string; type: 'file'; parentId: string; code: string; status?: 'active' | 'deleted'; deletionTime?: number; }
+  | { id: string; name: string; type: 'folder'; parentId?: string; children: string[]; status?: 'active' | 'deleted'; deletionTime?: number; };
 
 export interface FileSystemTree {
   [id: string]: FileSystemNode;
+}
+
+// Autocomplete Types
+export type SuggestionType = 'class' | 'method' | 'param' | 'library' | 'variable' | 'keyword' | 'function';
+export interface Suggestion {
+  label: string;
+  type: SuggestionType;
+  detail?: string;
 }

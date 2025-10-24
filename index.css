@@ -1,0 +1,131 @@
+html, body {
+    font-family: 'Roboto', sans-serif;
+}
+
+body {
+    /* A subtle gradient to add some depth */
+    background-color: #181a20;
+    background-image: radial-gradient(circle at 1px 1px, #3a3d46 1px, transparent 0);
+    background-size: 2rem 2rem;
+}
+
+.font-mono {
+    font-family: 'Roboto Mono', monospace;
+}
+
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0; transform: translateY(10px); }
+    10%, 90% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-out {
+    animation: fadeInOut 4s ease-in-out forwards;
+}
+
+/* Editor Styles */
+.editor-textarea, .editor-highlight, .editor-highlight-bg {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    padding: 0; margin: 0; border: 0;
+    font-family: 'Roboto Mono', monospace; font-size: 0.875rem; line-height: 1.25rem;
+    white-space: pre; word-wrap: normal; overflow: auto; background: transparent;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+}
+.editor-textarea { 
+    z-index: 2; 
+    color: transparent; 
+    caret-color: white; 
+    resize: none; 
+    outline: none; 
+}
+.editor-highlight { 
+    z-index: 1; 
+    pointer-events: none; 
+    color: #d1d5db; 
+}
+.editor-highlight-bg {
+    z-index: 0;
+    pointer-events: none;
+}
+.error-line-highlight {
+    position: absolute;
+    width: 100%;
+    height: 1.25rem; /* line-height */
+    background-color: rgba(239, 68, 68, 0.1); /* red-500 with alpha */
+    z-index: 0;
+}
+
+
+/* Syntax Highlighting Tokens */
+.token-comment { color: #6b7280; } /* gray-500 */
+.token-keyword { color: #c084fc; font-weight: 500; } /* purple-400 */
+.token-string { color: #4ade80; } /* green-400 */
+.token-number { color: #a78bfa; } /* violet-400 */
+.token-method { color: #60a5fa; } /* blue-400 */
+.token-variable { color: #facc15; } /* yellow-400 */
+.token-parameter { color: #9ca3af; } /* gray-400 */
+.token-tag { color: #f87171; } /* red-400 */
+.token-attr-name { color: #fb923c; } /* orange-400 */
+.token-attr-value { color: #4ade80; } /* green-400 */
+.token-function { color: #60a5fa; } /* blue-400 */
+
+/* AI Ghost Text Completion */
+.ghost-text {
+    color: #6b7280; /* gray-500 */
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+
+@keyframes reward-flash {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0); }
+    50% { box-shadow: 0 0 20px 10px rgba(250, 204, 21, 0.7); }
+}
+
+.reward-flash-animation {
+    animation: reward-flash 0.8s ease-out;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Autocomplete Popup Styles */
+.autocomplete-popup {
+    position: absolute;
+    z-index: 10;
+    background-color: #272a33;
+    border: 1px solid #3a3d46;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: 'Roboto', sans-serif;
+}
+
+.suggestion-item {
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #d1d5db; /* gray-300 */
+    white-space: nowrap;
+}
+
+.suggestion-item:hover {
+    background-color: #3a3d46;
+}
+
+.suggestion-item.active {
+    background-color: #1d4ed8; /* blue-700 */
+    color: white;
+}

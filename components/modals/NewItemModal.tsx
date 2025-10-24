@@ -87,6 +87,12 @@ const NewItemModal: React.FC<NewItemModalProps> = ({ type, parentId, fileSystem,
                                     <option value=".py">.py</option>
                                     <option value=".js">.js</option>
                                     <option value=".ts">.ts</option>
+                                    <option value=".html">.html</option>
+                                    <option value=".cpp">.cpp</option>
+                                    <option value=".cs">.cs</option>
+                                    <option value=".java">.java</option>
+                                    <option value=".go">.go</option>
+                                    <option value=".rs">.rs</option>
                                     <option value=".md">.md</option>
                                     <option value=".txt">.txt</option>
                                 </select>

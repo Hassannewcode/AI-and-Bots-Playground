@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { produce } from 'immer';
 import { nanoid } from 'nanoid';
 
 import { parseCode } from './game/engine';
 import { getGeminiResponse } from './game/gemini';
-import type { GameState, Problem, ExecutionStep, FileSystemTree, FileSystemNode, Sprite, Prop, Zone } from './game/types';
+import type { GameState, Problem, ExecutionStep, FileSystemTree, FileSystemNode } from './game/types';
 import { toggleFullscreen, shareCode } from './controls/gameControls';
 
 // Components
@@ -22,15 +21,13 @@ import { FileTreePanel } from './components/panels/FileTreePanel';
 
 // Icons
 import { 
-    PlayIcon, PauseIcon, ChevronRightIcon, ArrowPathIcon, Cog6ToothIcon, 
-    StarIcon, UserCircleIcon, TerminalIcon, ExclamationCircleIcon, BookOpenIcon, StopIcon
+    PlayIcon, ChevronRightIcon, ArrowPathIcon, Cog6ToothIcon, 
+    StarIcon, UserCircleIcon, TerminalIcon, ExclamationCircleIcon, BookOpenIcon, StopIcon, PauseIcon
 } from './components/icons';
 import { getIconForShape } from './components/icons';
 
-// FIX: Changed template literals to an array of strings joined by newline characters
-// to avoid TypeScript parser errors on the string content.
 const initialFiles: FileSystemTree = {
-  'root': { id: 'root', name: 'root', type: 'folder', children: ['main_py', 'readme_md'] },
+  'root': { id: 'root', name: 'root', type: 'folder', children: ['readme_md', 'main_py', 'world_html'] },
   'main_py': { 
     id: 'main_py', 
     name: 'main.py', 
@@ -38,42 +35,19 @@ const initialFiles: FileSystemTree = {
     parentId: 'root',
     code: [
       '# Welcome to the Universal Playground!',
-      '# This engine uses a common API across all languages.',
-      '# Libraries must be imported before use.',
-      'import ai, world, physics, sound, neurons',
+      '# Your world is now defined in world.html!',
       '',
-      '# --- World Setup ---',
-      'world.set_background(color="#334155")',
-      'world.create_zone(name="goal", x=80, y=85, width=10, height=10, color="#16a34a")',
+      '# Create a sprite and give it a brain',
+      'bot = ai.Sprite(name="PythonBot", shape="user", x=10, y=85)',
+      'bot.create_network()',
       '',
-      '# --- Physics & Props ---',
-      'physics.set_gravity(strength=0.005)',
-      'ai.create_prop(shape="wall", x=50, y=98, width=100, height=4, color="#475569")',
-      '',
-      '# --- Sprites ---',
-      'bot = ai.Sprite(name="UniversalBot", shape="user", x=10, y=10)',
-      'neurons.create_network(sprite=bot)',
-      'target = ai.Sprite(name="Beacon", shape="cube", x=80, y=85)',
-      '',
-      '# --- Actions ---',
-      'bot.go_to(x=target.x, y=target.y)',
-      'print(f"{bot.name} is moving towards {target.name}.")',
-      '',
-      'ai.wait(3)',
-      '',
+      '# Make it move and talk',
+      'bot.go_to(x=80, y=20)',
       'sound.play(x=bot.x, y=bot.y)',
-      'bot.say(message="Landed!")',
+      'bot.say(message="Real Python in control!")',
+      'bot.reward(value=1) # Give a positive reward!',
       '',
-      'neurons.reward(sprite=bot, value=1)',
-      'print(f"{bot.name} was rewarded for reaching the goal zone.")',
-      '',
-      'ai.wait(1)',
-      'target.rotate_to(angle=90, speed=1)',
-      'sound.play(x=target.x, y=target.y)',
-      'target.say(message="Objective complete.")',
-      '',
-      '# --- Gemini Integration ---',
-      'bot.chat(message="What\'s the next objective?")'
+      'print(f"Python bot {bot.name} is ready!")'
     ].join('\n')
   },
   'readme_md': {
@@ -84,88 +58,47 @@ const initialFiles: FileSystemTree = {
       code: [
         '# Universal Sprite IDE',
         '',
-        'Welcome! This IDE features a language-agnostic engine. You can write your simulation logic in Python, JavaScript, Lua, or any language you prefer, and the engine will understand it.',
+        'This IDE now has several major upgrades:',
         '',
         '## Key Features',
         '',
-        '*   **Universal API**: A single set of commands works across all languages. The engine parses the structure of the commands, not the language syntax itself.',
-        '*   **Mandatory Imports**: Just like real-world coding, you must `import` libraries like `ai`, `world`, etc., before using them.',
-        '*   **Live Preview**: Sprites and props appear instantly as you code.',
-        '*   **Full Creative Suite**:',
-        '    *   **`world`**: Set backgrounds and create interactive zones.',
-        '    *   **`physics`**: Add universal forces like gravity.',
-        '    *   **`sound`**: Create visual sound wave effects.',
-        '    *   **`neurons`**: Reward sprites to enable machine learning simulations.',
-        '    *   **`ai`**: Create sprites, make them talk, pathfind, and even chat using Gemini.',
+        '*   **Declarative Worlds**: Define your static props (walls, rocks) in `world.html`. The engine parses this file automatically when you run your code.',
+        '*   **AI Error Fixes**: When your code fails, an error appears in the **Problems** tab. Click the ✨ button to get an AI-powered explanation and a suggested fix from Gemini.',
+        '*   **Integrated Sprite AI**: The `neurons` library has been merged into sprites. You can now call `your_sprite.create_network()` and `your_sprite.reward()` directly.',
+        '*   **Real Execution**: Your Python and JavaScript code run in real, sandboxed environments. Other languages are for syntax highlighting only.',
         '',
         '## How to Run',
         '',
-        '1.  **Import** the libraries you need at the top of your file (e.g., `import ai, world`).',
-        '2.  Write your code in any file (e.g., `main.py`, `main.js`).',
-        '3.  Use the commands listed in the **Guide** tab.',
-        '4.  Click **Compile & Run** to execute the simulation.'
+        '1.  Edit `world.html` to design your level.',
+        '2.  Select a `.py` or `.js` file to script your sprites.',
+        '3.  Click **Run This File** to execute.'
       ].join('\n')
   },
+  'world_html': {
+    id: 'world_html',
+    name: 'world.html',
+    type: 'file',
+    parentId: 'root',
+    code: [
+        '<!-- Define static props for your world here. -->',
+        '<!-- The engine will parse these elements when you run your code. -->',
+        '<!-- Use `data-shape` for the type and inline styles for position/size. -->',
+        '',
+        '<div class="prop" data-shape="wall" style="left: 50%; top: 98%; width: 100%; height: 4%; background-color: #475569;"></div>',
+        '<div class="prop" data-shape="wall" style="left: 98%; top: 50%; width: 4%; height: 100%; background-color: #475569;"></div>',
+        '<div class="prop" data-shape="rock" style="left: 70%; top: 60%; width: 10%; height: 15%; background-color: #64748b;"></div>',
+    ].join('\n')
+  }
 };
 
-const CustomStyles = () => (
-    <style>{`
-        html, body {
-            font-family: 'Roboto', sans-serif;
-        }
-        .font-mono {
-            font-family: 'Roboto Mono', monospace;
-        }
-        @keyframes fadeInOut {
-            0%, 100% { opacity: 0; transform: translateY(10px); }
-            10%, 90% { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in-out {
-            animation: fadeInOut 4s ease-in-out forwards;
-        }
-
-        /* Editor Styles */
-        .editor-textarea, .editor-highlight {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            padding: 0; margin: 0; border: 0;
-            font-family: 'Roboto Mono', monospace; font-size: 0.875rem; line-height: 1.25rem;
-            white-space: pre; word-wrap: normal; overflow: auto; background: transparent;
-            -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-        }
-        .editor-textarea { z-index: 1; color: transparent; caret-color: white; resize: none; outline: none; }
-        .editor-highlight { z-index: 0; pointer-events: none; color: #d1d5db; }
-
-        /* Syntax Highlighting Tokens */
-        .token-comment { color: #6b7280; } /* gray-500 */
-        .token-keyword { color: #c084fc; font-weight: 500; } /* purple-400 */
-        .token-string { color: #4ade80; } /* green-400 */
-        .token-number { color: #a78bfa; } /* violet-400 */
-        .token-method { color: #60a5fa; } /* blue-400 */
-        .token-variable { color: #facc15; } /* yellow-400 */
-        .token-parameter { color: #9ca3af; } /* gray-400 */
-        .token-tag { color: #f87171; } /* red-400 */
-        .token-attr-name { color: #fb923c; } /* orange-400 */
-        .token-attr-value { color: #4ade80; } /* green-400 */
-        .token-function { color: #60a5fa; } /* blue-400 */
-        
-        @keyframes reward-flash {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0); }
-            50% { box-shadow: 0 0 20px 10px rgba(250, 204, 21, 0.7); }
-        }
-        .reward-flash-animation {
-            animation: reward-flash 0.8s ease-out;
-        }
-    `}</style>
-);
-
-const useDebouncedCallback = (callback: (...args: any[]) => void, delay: number) => {
+const useDebouncedAsyncCallback = (callback: (...args: any[]) => Promise<void>, delay: number) => {
   const timeoutRef = useRef<number | null>(null);
   return useCallback((...args: any[]) => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
-    timeoutRef.current = window.setTimeout(() => {
-      callback(...args);
+    timeoutRef.current = window.setTimeout(async () => {
+      await callback(...args);
     }, delay);
   }, [callback, delay]);
 };
@@ -181,6 +114,8 @@ const initialGameState: GameState = {
     }
 };
 
+const DELETION_PERIOD_MS = 3 * 60 * 60 * 1000; // 3 hours
+
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>(initialGameState);
   const [logs, setLogs] = useState<string[]>(['Welcome! Your environment will build live as you code.']);
@@ -188,21 +123,33 @@ const App: React.FC = () => {
   const [activeOutputTabId, setActiveOutputTabId] = useState('console');
 
   const [fileSystem, setFileSystem] = useState<FileSystemTree>(initialFiles);
-  const [openTabs, setOpenTabs] = useState<string[]>(['main_py', 'readme_md']);
-  const [activeTabId, setActiveTabId] = useState<string>('main_py');
+  const [openTabs, setOpenTabs] = useState<string[]>(['readme_md', 'main_py', 'world_html']);
+  const [activeTabId, setActiveTabId] = useState<string>('readme_md');
 
   const executionStepsRef = useRef<ExecutionStep[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false); // For compilation/parsing
   const runnerTimeoutRef = useRef<number | null>(null);
 
   const [isHelpOpen, setHelpOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [newItemModal, setNewItemModal] = useState<{ type: 'file' | 'folder', parentId: string } | null>(null);
   const [isMuted, setMuted] = useState(false);
+
+  const [settings, setSettings] = useState({
+    pythonEngine: 'pyodide' as 'pyodide' | 'pyscript',
+    keybindings: {
+        acceptSuggestion: 'Tab',
+        acceptAiCompletion: 'Tab',
+        cycleAiCompletionDown: 'Control+ArrowDown',
+        cycleAiCompletionUp: 'Control+ArrowUp',
+    }
+  });
   
   const activeFile = fileSystem[activeTabId];
   const code = (activeFile?.type === 'file' ? activeFile.code : '') || '';
+  const activeLanguage = activeFile?.name.split('.').pop() || 'txt';
 
   const processStep = useCallback(async (step: ExecutionStep) => {
       await setGameState(produce(draft => {
@@ -240,11 +187,11 @@ const App: React.FC = () => {
             });
             break;
           case 'SET_BACKGROUND': draft.worldState.backgroundColor = step.color; break;
-          case 'CREATE_ZONE': draft.worldState.zones.push(step.zone); break;
-          case 'CREATE_NETWORK': if (sprite) sprite.brain = { rewards: 0 }; break;
-          case 'REWARD_SPRITE':
+          case 'SPRITE_CREATE_NETWORK': if (sprite) sprite.brain = { rewards: 0 }; break;
+          case 'SPRITE_REWARD':
             if (sprite) {
-                if (sprite.brain) sprite.brain.rewards += step.value;
+                if (!sprite.brain) sprite.brain = { rewards: 0 };
+                sprite.brain.rewards += step.value;
                  draft.effects.push({
                     id: nanoid(6), type: 'rewardflash', spriteId: step.spriteId,
                     creationTime: Date.now(), duration: 800
@@ -289,13 +236,13 @@ const App: React.FC = () => {
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
                     setLogs(prev => [...prev.slice(0, -1), `Error: Gemini API call failed for ${receiverSprite.name}: ${errorMessage}`]);
-                    setProblems(prev => [...prev, { line: 0, message: `Gemini API Error: ${errorMessage}` }]);
+                    setProblems(prev => [...prev, { fileId: activeTabId, line: 0, message: `Gemini API Error: ${errorMessage}`, code: code, language: activeLanguage }]);
                     if (activeOutputTabId !== 'guide') setActiveOutputTabId('problems');
                 }
             }
         }
 
-  }, [gameState, currentStep, activeOutputTabId]);
+  }, [gameState, currentStep, activeOutputTabId, code, activeLanguage, activeTabId]);
 
   const runNextStep = useCallback(async () => {
     if (currentStep >= executionStepsRef.current.length) {
@@ -346,17 +293,13 @@ const App: React.FC = () => {
     };
   }, [isRunning, runNextStep]);
   
-  const updatePreview = useDebouncedCallback((codeToParse: string, fs: FileSystemTree) => {
-      if (!codeToParse) {
-          setGameState(initialGameState);
-          setProblems([]);
-          executionStepsRef.current = [];
-          return;
-      }
+  const updatePreview = useDebouncedAsyncCallback(async (codeToParse: string, fs: FileSystemTree, lang: string, fileId: string) => {
+      setIsExecuting(true);
       try {
-        const { steps, problems: compileProblems } = parseCode(codeToParse, fs);
+        const { steps, problems: compileProblems, logs: compileLogs } = await parseCode(codeToParse, fs, lang, fileId, settings.pythonEngine);
         
-        setProblems(compileProblems);
+        const problemsWithCodeContext = compileProblems.map(p => ({ ...p, code: codeToParse, language: lang }));
+        setProblems(problemsWithCodeContext);
         executionStepsRef.current = steps;
 
         const previewState = produce(initialGameState, draft => {
@@ -364,8 +307,7 @@ const App: React.FC = () => {
               if (step.type === 'CREATE_SPRITE') draft.sprites.push(step.sprite);
               if (step.type === 'CREATE_PROP') draft.props.push(step.prop);
               if (step.type === 'SET_BACKGROUND') draft.worldState.backgroundColor = step.color;
-              if (step.type === 'CREATE_ZONE') draft.worldState.zones.push(step.zone);
-              if (step.type === 'CREATE_NETWORK') {
+              if (step.type === 'SPRITE_CREATE_NETWORK') {
                   const sprite = draft.sprites.find(s => s.id === step.spriteId);
                   if (sprite) sprite.brain = { rewards: 0 };
               }
@@ -379,73 +321,108 @@ const App: React.FC = () => {
       } catch (e) {
           console.error("Critical error during code parsing:", e);
           const errorMessage = e instanceof Error ? e.message : "An unknown parsing error occurred.";
-          setProblems([{ line: 0, message: `Fatal Parser Error: ${errorMessage}` }]);
+          setProblems([{ fileId, line: 0, message: `Fatal Parser Error: ${errorMessage}`, code: codeToParse, language: lang }]);
           setGameState(initialGameState);
           executionStepsRef.current = [];
           if (activeOutputTabId !== 'guide') {
             setActiveOutputTabId('problems');
           }
+      } finally {
+          setIsExecuting(false);
       }
   }, 500);
 
   useEffect(() => {
-    if (activeFile?.type === 'file') {
-        updatePreview(activeFile.code, fileSystem);
+    // Live preview for runnable files only
+    if (activeFile?.type === 'file' && (activeFile.name.endsWith('.py') || activeFile.name.endsWith('.js'))) {
+        updatePreview(activeFile.code, fileSystem, activeLanguage, activeTabId);
+    } else {
+        // For non-runnable files like HTML or MD, just clear problems and steps
+        setProblems([]);
+        executionStepsRef.current = [];
+        // Optional: you could have a separate "live preview" for HTML files here
     }
-  }, [activeFile?.code, fileSystem, updatePreview]);
+  }, [activeFile?.code, fileSystem, activeLanguage, activeTabId, updatePreview, settings.pythonEngine]);
 
-  const resetSimulation = (clearCode: boolean = false) => {
+  const resetSimulation = async () => {
     setIsRunning(false);
     if (runnerTimeoutRef.current) clearTimeout(runnerTimeoutRef.current);
     
-    const codeToParse = activeFile?.type === 'file' ? activeFile.code : '';
-    const { steps } = parseCode(codeToParse, fileSystem);
-    
-    const previewState = produce(initialGameState, draft => {
-        for (const step of steps) {
-            if (step.type === 'CREATE_SPRITE') draft.sprites.push(step.sprite);
-            if (step.type === 'CREATE_PROP') draft.props.push(step.prop);
-            if (step.type === 'SET_BACKGROUND') draft.worldState.backgroundColor = step.color;
-            if (step.type === 'CREATE_ZONE') draft.worldState.zones.push(step.zone);
-        }
-    });
+     // We need to re-parse to get the initial state from world.html etc.
+    const { steps, problems: compileProblems } = await parseCode(code, fileSystem, activeLanguage, activeTabId, settings.pythonEngine);
+    if (compileProblems.length > 0) {
+        setGameState(initialGameState);
+    } else {
+        const previewState = produce(initialGameState, draft => {
+            for (const step of steps) {
+                if (step.type === 'CREATE_SPRITE') draft.sprites.push(step.sprite);
+                if (step.type === 'CREATE_PROP') draft.props.push(step.prop);
+                if (step.type === 'SET_BACKGROUND') draft.worldState.backgroundColor = step.color;
+            }
+        });
+        setGameState(previewState);
+    }
 
-    setGameState(previewState);
     setLogs(['Simulation reset.']);
     setCurrentStep(0);
-
-     if(clearCode) {
-        setFileSystem(initialFiles);
-        setOpenTabs(['main_py', 'readme_md']);
-        setActiveTabId('main_py');
-     }
   };
   
-  const handleCompileAndRun = () => {
-    if (problems.length > 0) {
-        if (activeOutputTabId !== 'guide') setActiveOutputTabId('problems');
-        setLogs(prev => [...prev, 'Cannot run due to compilation errors.']);
-        return;
-    }
-    
-    setIsRunning(false);
-    if (runnerTimeoutRef.current) clearTimeout(runnerTimeoutRef.current);
-    
-    const previewState = produce(initialGameState, draft => {
-        for (const step of executionStepsRef.current) {
-            if (step.type === 'CREATE_SPRITE') draft.sprites.push(step.sprite);
-            if (step.type === 'CREATE_PROP') draft.props.push(step.prop);
-            if (step.type === 'SET_BACKGROUND') draft.worldState.backgroundColor = step.color;
-            if (step.type === 'CREATE_ZONE') draft.worldState.zones.push(step.zone);
-        }
+  const startSimulation = () => {
+    resetSimulation().then(() => {
+        setLogs(['Running simulation...']);
+        setCurrentStep(0);
+        setActiveOutputTabId('console');
+        setIsRunning(true);
     });
-    
-    setGameState(previewState);
-    setLogs(['Running simulation...']);
-    setCurrentStep(0);
-    setActiveOutputTabId('console');
-    setIsRunning(true);
   };
+
+  const handleRun = async (runCode: string, lang: string, fileId: string) => {
+    setIsExecuting(true);
+    setLogs([`Executing ${lang} code...`]);
+    try {
+        const { steps, problems: compileProblems, logs: compileLogs } = await parseCode(runCode, fileSystem, lang, fileId, settings.pythonEngine);
+        
+        const problemsWithCodeContext = compileProblems.map(p => ({ ...p, code: runCode, language: lang }));
+        setProblems(problemsWithCodeContext);
+        setLogs(prev => [...prev, ...compileLogs]);
+
+        if (compileProblems.length > 0) {
+            if (activeOutputTabId !== 'guide') setActiveOutputTabId('problems');
+            setLogs(prev => [...prev, 'Cannot run due to errors.']);
+            return;
+        }
+        executionStepsRef.current = steps;
+        startSimulation();
+    } catch(e) {
+        const errorMessage = e instanceof Error ? e.message : "An unknown execution error occurred.";
+        setProblems(prev => [...prev, { fileId, line: 0, message: `Fatal Execution Error: ${errorMessage}`, code: runCode, language: lang }]);
+        if (activeOutputTabId !== 'guide') setActiveOutputTabId('problems');
+    } finally {
+        setIsExecuting(false);
+    }
+  };
+  
+  const handleRunCurrentFile = () => {
+    if (activeFile?.type !== 'file' || isExecuting || activeFile?.status === 'deleted') return;
+    handleRun(activeFile.code, activeLanguage, activeTabId);
+  };
+
+  const handleRunAllOpenFiles = () => {
+      if (isExecuting) return;
+      const runnableTabs = openTabs
+        .map(id => fileSystem[id])
+        .filter(node => node?.type === 'file' && (node.name.endsWith('.js') || node.name.endsWith('.py')) && node.status !== 'deleted');
+
+      if (runnableTabs.length === 0) {
+          setLogs(prev => [...prev, 'No runnable files (.js, .py) are open.']);
+          return;
+      }
+      
+      const combinedCode = runnableTabs.map(node => (node as any).code).join('\n\n');
+      // Use the language and fileId of the active tab as the primary context
+      handleRun(combinedCode, activeLanguage, activeTabId);
+  };
+
 
   const handlePause = () => setIsRunning(false);
   const handleStop = () => resetSimulation();
@@ -465,6 +442,26 @@ const App: React.FC = () => {
         }));
     }
   };
+
+  const handleApplyCodeFix = (fileId: string, startLine: number, endLine: number, newCode: string) => {
+    setFileSystem(produce(draft => {
+        const file = draft[fileId] as Extract<FileSystemNode, {type: 'file'}>;
+        if (!file) {
+            console.error(`Attempted to apply fix to non-existent file ID: ${fileId}`);
+            return;
+        }
+        const lines = file.code.split('\n');
+        const numLinesToDelete = endLine - startLine + 1;
+
+        // Replace the block of erroneous lines with the new code, which might be multi-line
+        lines.splice(startLine - 1, numLinesToDelete, ...newCode.split('\n'));
+        file.code = lines.join('\n');
+    }));
+
+    // Remove the problem that was clicked on to be fixed.
+    // The user can re-run the code to get an updated list of problems.
+    setProblems(prev => prev.filter(p => !(p.fileId === fileId && p.line >= startLine && p.line <= endLine)));
+  };
   
   const handleNewItem = (type: 'file' | 'folder', parentId: string) => {
     setNewItemModal({ type, parentId });
@@ -473,7 +470,7 @@ const App: React.FC = () => {
 
   const handleCreateItem = (name: string, parentId: string, type: 'file' | 'folder') => {
       const newId = nanoid(8);
-      let newCode = `# New file: ${name}\n\n# This is a universal engine.\n# Use the Guide tab for API commands.\n`;
+      let newCode = `# New file: ${name}`;
 
       setFileSystem(produce(draft => {
         const parent = draft[parentId] as Extract<FileSystemNode, {type: 'folder'}>;
@@ -484,8 +481,8 @@ const App: React.FC = () => {
         if (nameExists) return;
         
         const newNode: FileSystemNode = type === 'file'
-            ? { id: newId, name: newName, type: 'file', parentId, code: newCode }
-            : { id: newId, name: newName, type: 'folder', parentId, children: [] };
+            ? { id: newId, name: newName, type: 'file', parentId, code: newCode, status: 'active' }
+            : { id: newId, name: newName, type: 'folder', parentId, children: [], status: 'active' };
         
         draft[newId] = newNode;
         parent.children.push(newId);
@@ -498,10 +495,105 @@ const App: React.FC = () => {
       }
   };
 
+  const handleSoftDelete = useCallback((itemId: string) => {
+    setFileSystem(produce(draft => {
+        const item = draft[itemId];
+        if (item) {
+            item.status = 'deleted';
+            item.deletionTime = Date.now();
+        }
+    }));
+
+    const newTabs = openTabs.filter(t => t !== itemId);
+    setOpenTabs(newTabs);
+    if (activeTabId === itemId) {
+        if (newTabs.length > 0) {
+            const tabIndex = openTabs.indexOf(itemId);
+            setActiveTabId(newTabs[Math.max(0, tabIndex - 1)]);
+        } else {
+            setActiveTabId('');
+        }
+    }
+  }, [openTabs, activeTabId]);
+
+  const handlePermanentDelete = useCallback((itemId: string) => {
+    let allIdsToDelete: string[] = [];
+
+    setFileSystem(produce(draft => {
+        const queue = [itemId];
+        const visited = new Set<string>();
+
+        while (queue.length > 0) {
+            const currentId = queue.shift()!;
+            if (visited.has(currentId)) continue;
+            visited.add(currentId);
+            allIdsToDelete.push(currentId);
+
+            const currentNode = draft[currentId];
+            if (currentNode.type === 'folder') {
+                queue.push(...currentNode.children);
+            }
+
+            if (currentNode.parentId) {
+                const parent = draft[currentNode.parentId] as Extract<FileSystemNode, { type: 'folder' }>;
+                if (parent) {
+                    parent.children = parent.children.filter(id => id !== currentId);
+                }
+            }
+        }
+        
+        for (const id of allIdsToDelete) {
+            delete draft[id];
+        }
+    }));
+
+    setOpenTabs(tabs => tabs.filter(t => !allIdsToDelete.includes(t)));
+    if (allIdsToDelete.includes(activeTabId)) {
+        const newTabs = openTabs.filter(t => !allIdsToDelete.includes(t));
+        setActiveTabId(newTabs[0] || '');
+    }
+  }, [activeTabId, openTabs]);
+
+  const handleRestore = useCallback((itemId: string) => {
+    setFileSystem(produce(draft => {
+        const queue = [itemId];
+        while (queue.length > 0) {
+            const currentId = queue.shift()!;
+            const item = draft[currentId];
+            if (item) {
+                item.status = 'active';
+                delete item.deletionTime;
+                if (item.type === 'folder') {
+                    queue.push(...item.children);
+                }
+            }
+        }
+    }));
+  }, []);
+
+  useEffect(() => {
+    const purgeInterval = setInterval(() => {
+        const now = Date.now();
+        const expiredIds: string[] = [];
+        for (const id in fileSystem) {
+            const node = fileSystem[id];
+            if (node.status === 'deleted' && node.deletionTime && (now - node.deletionTime > DELETION_PERIOD_MS)) {
+                expiredIds.push(id);
+            }
+        }
+        if (expiredIds.length > 0) {
+            expiredIds.forEach(id => handlePermanentDelete(id));
+        }
+    }, 60 * 1000); // Check every minute
+
+    return () => clearInterval(purgeInterval);
+  }, [fileSystem, handlePermanentDelete]);
+
+
   const primaryDisplayControls = [
-    { id: 'play', icon: isRunning ? <PauseIcon /> : <PlayIcon />, onClick: isRunning ? handlePause : handleCompileAndRun, isPrimary: true, disabled: executionStepsRef.current.length === 0 || currentStep >= executionStepsRef.current.length },
-    { id: 'step', icon: <ChevronRightIcon />, onClick: handleStepForward, disabled: isRunning || currentStep >= executionStepsRef.current.length },
-    { id: 'stop', icon: <StopIcon />, onClick: handleStop, disabled: executionStepsRef.current.length === 0 },
+    { id: 'play', icon: isRunning ? <PauseIcon /> : (isExecuting ? <ArrowPathIcon className="animate-spin" /> : <PlayIcon />), onClick: isRunning ? handlePause : handleRunCurrentFile, isPrimary: true, disabled: isExecuting || (activeLanguage !== 'py' && activeLanguage !== 'js') },
+    { id: 'step', icon: <ChevronRightIcon />, onClick: handleStepForward, disabled: isExecuting || isRunning || currentStep >= executionStepsRef.current.length },
+    { id: 'stop', icon: <StopIcon />, onClick: handleStop, disabled: isExecuting || executionStepsRef.current.length === 0 },
   ];
 
   const infoCardsData = gameState.sprites.map(sprite => ({
@@ -521,15 +613,18 @@ const App: React.FC = () => {
   const editorActions = [ {id: 'settings', icon: <Cog6ToothIcon />, onClick: () => setSettingsOpen(true)} ];
   const currentUser = { name: 'Current User', avatar: <UserCircleIcon className="w-full h-full text-gray-500" />, status: 'ONLINE', rank: 'N/A', rankIcon: <StarIcon /> };
   const actionButtons = [
-    { id: 'primary', text: 'Compile & Run', icon: <PlayIcon />, onClick: handleCompileAndRun, style: 'primary' },
-    { id: 'secondary', text: 'Reset All', icon: <ArrowPathIcon />, onClick: () => resetSimulation(true), style: 'secondary' },
+    { id: 'primary', text: 'Run This File', icon: <PlayIcon />, onClick: handleRunCurrentFile, style: 'primary' },
+    { id: 'secondary', text: 'Run All Open Files', icon: <PlayIcon />, onClick: handleRunAllOpenFiles, style: 'secondary' },
   ];
 
   return (
     <>
-      <CustomStyles />
       {isHelpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
-      {isSettingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {isSettingsOpen && <SettingsModal 
+          settings={settings}
+          setSettings={setSettings}
+          onClose={() => setSettingsOpen(false)} 
+      />}
       {newItemModal && <NewItemModal 
           type={newItemModal.type} 
           parentId={newItemModal.parentId}
@@ -537,7 +632,7 @@ const App: React.FC = () => {
           onCreate={handleCreateItem}
           fileSystem={fileSystem}
       />}
-      <div className="h-screen w-screen flex flex-col bg-[#181a20] text-gray-300 font-sans text-sm">
+      <div className="h-screen w-screen flex flex-col font-sans text-sm">
         <main className="flex-grow p-2 flex space-x-2 overflow-hidden">
           
           <FileTreePanel 
@@ -545,8 +640,12 @@ const App: React.FC = () => {
             setFileSystem={setFileSystem}
             openTabs={openTabs}
             setOpenTabs={setOpenTabs}
+            activeTabId={activeTabId}
             setActiveTabId={setActiveTabId}
             onNewItem={handleNewItem}
+            onSoftDelete={handleSoftDelete}
+            onPermanentDelete={handlePermanentDelete}
+            onRestore={handleRestore}
           />
           
           <div className="flex flex-col space-y-2 min-h-0" style={{flex: '2 1 0%'}}>
@@ -567,9 +666,8 @@ const App: React.FC = () => {
                     onTabClick={setActiveOutputTabId} 
                     logs={logs}
                     problems={problems}
-                    fileSystem={fileSystem}
-                    openTabs={openTabs}
-                    activeEditorTabId={activeTabId}
+                    activeLanguage={activeLanguage}
+                    onApplyFix={handleApplyCodeFix}
                 />
             </div>
           </div>
@@ -580,19 +678,11 @@ const App: React.FC = () => {
                 activeTabId={activeTabId}
                 openTabs={openTabs}
                 fileSystem={fileSystem}
+                problems={problems}
+                settings={settings}
                 onTabClick={setActiveTabId}
-                onTabClose={(tabId) => {
-                  const tabIndex = openTabs.indexOf(tabId);
-                  const newTabs = openTabs.filter(t => t !== tabId);
-                  setOpenTabs(newTabs);
-                  if (activeTabId === tabId) {
-                      if (newTabs.length > 0) {
-                          setActiveTabId(newTabs[Math.max(0, tabIndex - 1)]);
-                      } else {
-                          setActiveTabId('');
-                      }
-                  }
-                }}
+                onTabsReorder={setOpenTabs}
+                onTabClose={handleSoftDelete}
                 onCodeChange={updateCode}
                 onNewFileClick={() => handleNewItem('file', 'root')}
               />
@@ -603,6 +693,7 @@ const App: React.FC = () => {
                       title="Actions" 
                       buttons={actionButtons} 
                       onHelpClick={() => setHelpOpen(true)}
+                      isExecuting={isExecuting}
                   />
               </div>
           </div>

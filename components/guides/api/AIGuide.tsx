@@ -10,12 +10,6 @@ export const AIGuide: React.FC = () => (
             <CodeLine comment="Available shapes: 'cube', 'skull', 'user', 'smiley'.">
                 <span className="token-variable">foe</span> = ai.Sprite(name=<span className="token-string">"Menace"</span>, shape=<span className="token-string">"skull"</span>)
             </CodeLine>
-             <CodeLine comment="Creates a static, non-interactive prop.">
-                ai.create_prop(shape=<span className="token-string">"wall"</span>, x=<span className="token-number">50</span>, y=<span className="token-number">98</span>, width=<span className="token-number">100</span>, height=<span className="token-number">4</span>, color=<span className="token-string">"#475569"</span>)
-            </CodeLine>
-            <CodeLine comment="Available shapes: 'wall', 'rock'.">
-                 ai.create_prop(shape=<span className="token-string">"rock"</span>, x=<span className="token-number">70</span>, y=<span className="token-number">70</span>, width=<span className="token-number">8</span>, height=<span className="token-number">8</span>)
-            </CodeLine>
             <CodeLine comment="Pauses the simulation for a number of seconds.">
                 ai.wait(<span className="token-number">1.5</span>)
             </CodeLine>
@@ -38,6 +32,12 @@ export const AIGuide: React.FC = () => (
             </CodeLine>
             <CodeLine comment="Send a message to another sprite to trigger a Gemini chat response.">
                 <span className="token-variable">bot</span>.chat(message=<span className="token-string">"What is our objective?"</span>)
+            </CodeLine>
+             <CodeLine comment="Initializes a neural network for this sprite, enabling rewards.">
+                <span className="token-variable">bot</span>.create_network()
+            </CodeLine>
+             <CodeLine comment="Provides a positive or negative reward value to the sprite's network.">
+                <span className="token-variable">bot</span>.reward(value=<span className="token-number">1</span>)
             </CodeLine>
         </GuideSection>
     </>

@@ -1,7 +1,8 @@
 
-import React from 'react';
+
+import React, { useState } from 'react';
 import CodeEditor from '../editor/CodeEditor';
-import type { FileSystemTree } from '../../game/types';
+import type { FileSystemTree, Problem } from '../../game/types';
 import { FileIcon, XMarkIcon, PlusIcon } from '../icons';
 
 interface EditorPanelProps {
@@ -9,45 +10,112 @@ interface EditorPanelProps {
     openTabs: string[];
     activeTabId: string;
     fileSystem: FileSystemTree;
+    problems: Problem[];
+    settings: any; // Allow passing settings object
     onTabClick: (tabId: string) => void;
     onTabClose: (tabId: string) => void;
     onCodeChange: (code: string) => void;
     onNewFileClick: () => void;
+    onTabsReorder: (tabs: string[]) => void;
 }
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({ 
-    actions, openTabs, activeTabId, fileSystem, onTabClick, onTabClose, onCodeChange, onNewFileClick
+    actions, openTabs, activeTabId, fileSystem, problems, settings, onTabClick, onTabClose, onCodeChange, onNewFileClick, onTabsReorder
 }) => {
   const activeFile = fileSystem[activeTabId];
   const code = (activeFile?.type === 'file' ? activeFile.code : '') || '';
   const activeLanguage = activeFile?.name.split('.').pop() || 'txt';
+  
+  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+  const [dropIndicatorIndex, setDropIndicatorIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, tabId: string) => {
+      e.dataTransfer.setData('application/tab-id', tabId);
+      e.dataTransfer.effectAllowed = 'move';
+      // Use a timeout to allow the browser to render the drag image before updating state
+      setTimeout(() => setDraggedTabId(tabId), 0);
+  };
+
+  const handleDragEnd = () => {
+      setDraggedTabId(null);
+      setDropIndicatorIndex(null);
+  };
+  
+  const handleDragOverTab = (e: React.DragEvent<HTMLDivElement>, targetTabId: string) => {
+      e.preventDefault();
+      if (!draggedTabId || draggedTabId === targetTabId) return;
+
+      const targetIndex = openTabs.indexOf(targetTabId);
+      const rect = e.currentTarget.getBoundingClientRect();
+      const isRightHalf = e.clientX > rect.left + rect.width / 2;
+      
+      const newIndicatorIndex = isRightHalf ? targetIndex + 1 : targetIndex;
+      if (newIndicatorIndex !== dropIndicatorIndex) {
+          setDropIndicatorIndex(newIndicatorIndex);
+      }
+  };
+
+  const handleDropOnTabBar = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      const draggedId = e.dataTransfer.getData('application/tab-id');
+      if (!draggedId || dropIndicatorIndex === null) return;
+      
+      const draggedIndex = openTabs.indexOf(draggedId);
+      if (draggedIndex === -1) return;
+
+      const newTabs = [...openTabs];
+      const [removedTab] = newTabs.splice(draggedIndex, 1);
+      
+      // Adjust the drop index if we're moving an item from left to right
+      const adjustedDropIndex = dropIndicatorIndex > draggedIndex ? dropIndicatorIndex - 1 : dropIndicatorIndex;
+      
+      newTabs.splice(adjustedDropIndex, 0, removedTab);
+      onTabsReorder(newTabs);
+  };
+
+  const handleDragLeaveTabBar = () => {
+      setDropIndicatorIndex(null);
+  };
+
 
   return (
     <div className="flex-grow bg-[#1e2026] rounded-lg flex flex-col text-sm font-mono border border-[#3a3d46]">
       {/* Tab Bar */}
       <div className="h-10 flex items-center bg-[#272a33] border-b border-[#3a3d46] text-gray-400">
-        <div className="flex-grow flex items-stretch h-full">
-            {openTabs.map(tabId => {
+        <div 
+            className="flex-grow flex items-stretch h-full"
+            onDrop={handleDropOnTabBar}
+            onDragOver={(e) => e.preventDefault()}
+            onDragLeave={handleDragLeaveTabBar}
+        >
+            {openTabs.map((tabId, index) => {
                 const file = fileSystem[tabId];
-                if (!file) return null;
+                if (!file || file.status === 'deleted') return null;
                 const isActive = tabId === activeTabId;
                 return (
-                    <div 
-                        key={tabId}
-                        onClick={() => onTabClick(tabId)}
-                        className={`flex items-center px-3 border-r border-[#3a3d46] cursor-pointer hover:bg-[#22252a] ${isActive ? 'bg-[#1e2026] text-white' : ''}`}
-                    >
-                        <FileIcon className="w-4 h-4 mr-2 text-gray-500" />
-                        <span className="text-xs font-semibold">{file.name}</span>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); onTabClose(tabId); }}
-                            className="ml-3 text-gray-500 hover:text-white rounded-full hover:bg-gray-600 p-0.5"
-                        >
-                            <XMarkIcon className="w-3 h-3" />
-                        </button>
-                    </div>
+                    <React.Fragment key={tabId}>
+                      {dropIndicatorIndex === index && <div className="w-0.5 h-6 bg-sky-400 self-center" />}
+                      <div 
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, tabId)}
+                          onDragEnd={handleDragEnd}
+                          onDragOver={(e) => handleDragOverTab(e, tabId)}
+                          onClick={() => onTabClick(tabId)}
+                          className={`flex items-center px-3 border-r border-[#3a3d46] cursor-pointer hover:bg-[#22252a] transition-opacity ${isActive ? 'bg-[#1e2026] text-white' : ''} ${draggedTabId === tabId ? 'opacity-50' : ''}`}
+                      >
+                          <FileIcon className="w-4 h-4 mr-2 text-gray-500" />
+                          <span className="text-xs font-semibold">{file.name}</span>
+                          <button 
+                              onClick={(e) => { e.stopPropagation(); onTabClose(tabId); }}
+                              className="ml-3 text-gray-500 hover:text-white rounded-full hover:bg-gray-600 p-0.5"
+                          >
+                              <XMarkIcon className="w-3 h-3" />
+                          </button>
+                      </div>
+                    </React.Fragment>
                 )
             })}
+            {dropIndicatorIndex === openTabs.length && <div className="w-0.5 h-6 bg-sky-400 self-center" />}
             <button
                 onClick={onNewFileClick}
                 className="flex items-center justify-center px-3 text-gray-400 hover:text-white hover:bg-[#22252a] border-r border-[#3a3d46]"
@@ -66,7 +134,13 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
       {/* Editor */}
       <div className="flex-grow relative min-h-0">
         {activeTabId && activeFile ? (
-            <CodeEditor code={code} onCodeChange={onCodeChange} language={activeLanguage} />
+            <CodeEditor 
+              code={code} 
+              onCodeChange={onCodeChange} 
+              language={activeLanguage}
+              problems={problems}
+              settings={settings}
+            />
         ) : (
             <div className="absolute inset-0 flex items-center justify-center text-gray-500">
                 Select a file to begin editing.
