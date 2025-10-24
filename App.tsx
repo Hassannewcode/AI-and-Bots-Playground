@@ -1,11 +1,13 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { produce } from 'immer';
 import { nanoid } from 'nanoid';
+import type { Content, FunctionCall, Chat } from '@google/genai';
 
 import { parseCode } from './game/engine';
-import { getGeminiResponse } from './game/gemini';
-import type { GameState, Problem, ExecutionStep, FileSystemTree, FileSystemNode } from './game/types';
+import { getGeminiResponse, createAssistantChatSession } from './game/gemini';
+import type { GameState, Problem, ExecutionStep, FileSystemTree, FileSystemNode, PanelLayout, PanelComponentKey } from './game/types';
 import { toggleFullscreen, shareCode } from './controls/gameControls';
 
 // Components
@@ -15,10 +17,14 @@ import { TabbedOutputPanel } from './components/panels/TabbedOutputPanel';
 import { EditorPanel } from './components/panels/EditorPanel';
 import { UserDetailsPanel } from './components/panels/UserDetailsPanel';
 import { ActionButtonsPanel } from './components/panels/ActionButtonsPanel';
+import { AIChatPanel } from './components/panels/AIChatPanel';
 import HelpModal from './components/modals/HelpModal';
 import SettingsModal from './components/modals/SettingsModal';
 import NewItemModal from './components/modals/NewItemModal';
+import LayoutCustomizer from './components/modals/LayoutCustomizer';
+import ConfirmationModal from './components/modals/ConfirmationModal';
 import { FileTreePanel } from './components/panels/FileTreePanel';
+
 
 // Icons
 import { 
@@ -125,10 +131,26 @@ const App: React.FC = () => {
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [newItemModal, setNewItemModal] = useState<{ type: 'file' | 'folder', parentId: string } | null>(null);
   const [isMuted, setMuted] = useState(false);
+  const [isLayoutCustomizationActive, setLayoutCustomizationActive] = useState(false);
+  
+  // AI Assistant State
+  const assistantChatRef = useRef<Chat | null>(null);
+  const [aiChatHistory, setAiChatHistory] = useState<Content[]>([
+    { role: 'model', parts: [{ text: "Hello! I'm Coder, your AI assistant. I can help you create, analyze, and edit files. How can I help?" }]}
+  ]);
+  const [isAiAssistantLoading, setIsAiAssistantLoading] = useState(false);
+  const [confirmation, setConfirmation] = useState<{ message: string; onConfirm: () => void; onCancel: () => void } | null>(null);
+
+  const defaultLayout: PanelLayout = {
+    left: ['FileTreePanel'],
+    middle: ['EditorPanel', 'TabbedOutputPanel'],
+    right: ['PrimaryDisplayPanel', 'AIChatPanel', 'ActionButtonsPanel']
+  };
 
   const [settings, setSettings] = useState({
     pythonEngine: 'pyodide' as 'pyodide' | 'pyscript',
-    layout: 'default' as 'default' | 'code-focused' | 'preview-focused',
+    layout: 'default' as 'default' | 'code-focused' | 'preview-focused' | 'custom',
+    customLayout: defaultLayout,
     keybindings: {
         acceptSuggestion: 'Tab',
         acceptAiCompletion: 'Tab',
@@ -542,6 +564,122 @@ const App: React.FC = () => {
     return () => clearInterval(purgeInterval);
   }, [fileSystem, handlePermanentDelete]);
 
+    const findFileIdByName = (name: string): string | null => {
+        // FIX: Explicitly type `node` as FileSystemNode to resolve TypeScript inference issue.
+        const found = Object.values(fileSystem).find((node: FileSystemNode) => node.name === name && node.type === 'file' && node.status !== 'deleted');
+        return found ? found.id : null;
+    };
+    
+  // AI Assistant Tool Handlers
+  const assistantTools = {
+      listAllFiles: () => {
+          // FIX: Explicitly type `f` as FileSystemNode to resolve TypeScript inference issue.
+          const files = Object.values(fileSystem).filter((f: FileSystemNode) => f.status !== 'deleted').map(f => f.name).join('\n');
+          return { result: `Here are all the files in the workspace:\n${files}` };
+      },
+      readFile: ({ fileName }: { fileName: string }) => {
+          const fileId = findFileIdByName(fileName);
+          const file = fileId ? fileSystem[fileId] as Extract<FileSystemNode, { type: 'file' }> : null;
+          return file ? { result: file.code } : { result: `Error: File '${fileName}' not found.` };
+      },
+      getActiveFileContent: () => {
+          return activeFile?.type === 'file' ? { result: activeFile.code } : { result: 'No file is currently active in the editor.' };
+      },
+      createFile: ({ fileName }: { fileName: string }) => {
+          if (findFileIdByName(fileName)) return { result: `Error: File '${fileName}' already exists.` };
+          handleCreateItem(fileName, 'root', 'file');
+          return { result: `File '${fileName}' created successfully.` };
+      },
+      renameFile: ({ oldFileName, newFileName }: { oldFileName: string, newFileName: string }) => {
+          const fileId = findFileIdByName(oldFileName);
+          if (!fileId) return { result: `Error: File '${oldFileName}' not found.` };
+          if (findFileIdByName(newFileName)) return { result: `Error: A file named '${newFileName}' already exists.` };
+          setFileSystem(produce(draft => { draft[fileId].name = newFileName; }));
+          return { result: `Renamed '${oldFileName}' to '${newFileName}'.` };
+      },
+      replaceCodeInRange: ({ fileName, startLine, endLine, newCode }: { fileName: string, startLine: number, endLine: number, newCode: string }) => {
+          const fileId = findFileIdByName(fileName);
+          if (!fileId) return { result: `Error: File '${fileName}' not found.` };
+          handleApplyCodeFix(fileId, startLine, endLine, newCode);
+          return { result: `Code updated in '${fileName}'.` };
+      },
+      deleteFile: ({ fileName }: { fileName: string }) => {
+          const fileId = findFileIdByName(fileName);
+          if (!fileId) return { result: `Error: File '${fileName}' not found.` };
+
+          return new Promise(resolve => {
+            const onConfirm = () => {
+                handleSoftDelete(fileId);
+                setConfirmation(null);
+                resolve({ result: `User confirmed. File '${fileName}' deleted.` });
+            };
+            const onCancel = () => {
+                setConfirmation(null);
+                resolve({ result: 'User cancelled file deletion.' });
+            };
+            setConfirmation({
+                message: `The AI assistant wants to delete "${fileName}". Are you sure?`,
+                onConfirm,
+                onCancel
+            });
+          });
+      },
+  };
+
+    const handleSendAiChatMessage = async (message: string) => {
+        if (!assistantChatRef.current) {
+            assistantChatRef.current = createAssistantChatSession();
+        }
+        
+        setIsAiAssistantLoading(true);
+
+        const newHistory: Content[] = [...aiChatHistory, { role: 'user', parts: [{ text: message }] }];
+        setAiChatHistory(newHistory);
+        
+        try {
+            const chat = assistantChatRef.current;
+            let result = await chat.sendMessage({ message });
+
+            while (true) {
+                const functionCalls = result.functionCalls;
+                if (!functionCalls || functionCalls.length === 0) {
+                    setAiChatHistory(prev => [...prev, { role: 'model', parts: [{ text: result.text }] }]);
+                    break; 
+                }
+                
+                setAiChatHistory(prev => [...prev, { role: 'model', parts: [{ functionCall: functionCalls[0] }] }]);
+
+                const call = functionCalls[0] as FunctionCall;
+                const toolName = call.name as keyof typeof assistantTools;
+
+                if (toolName in assistantTools) {
+                    const toolResult = await assistantTools[toolName](call.args as any);
+                     result = await chat.sendToolResponse({
+                        functionResponses: {
+                           id: call.id,
+                           name: call.name,
+                           response: toolResult,
+                        }
+                    });
+                } else {
+                     result = await chat.sendToolResponse({
+                         functionResponses: {
+                            id: call.id,
+                            name: call.name,
+                            response: { result: `Error: Unknown tool '${toolName}'.` },
+                         }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error("AI Assistant Error:", error);
+            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+            setAiChatHistory(prev => [...prev, { role: 'model', parts: [{ text: `Sorry, I encountered an error: ${errorMessage}` }] }]);
+        } finally {
+            setIsAiAssistantLoading(false);
+        }
+    };
+
 
   const primaryDisplayControls = [
     { id: 'play', icon: isRunning ? <PauseIcon /> : (isExecuting ? <ArrowPathIcon className="animate-spin" /> : <PlayIcon />), onClick: isRunning ? handlePause : handleRunCurrentFile, isPrimary: true, disabled: isExecuting || (activeLanguage !== 'py' && activeLanguage !== 'js') },
@@ -571,93 +709,126 @@ const App: React.FC = () => {
   ];
   
   const renderLayout = () => {
-        const fileTreeColumn = (
-            // FIX: Wrap FileTreePanel in a React.Fragment to pass the `key` prop without causing a type error.
-            // The `key` is required because this element is part of an array returned by renderLayout.
-            // Fragments do not render to the DOM, preserving the flexbox layout.
-            <React.Fragment key="file-tree">
-                <FileTreePanel 
-                    fileSystem={fileSystem}
-                    setFileSystem={setFileSystem}
-                    openTabs={openTabs}
-                    setOpenTabs={setOpenTabs}
-                    activeTabId={activeTabId}
-                    setActiveTabId={setActiveTabId}
-                    onNewItem={handleNewItem}
-                    onSoftDelete={handleSoftDelete}
-                    onPermanentDelete={handlePermanentDelete}
-                    onRestore={handleRestore}
-                />
-            </React.Fragment>
-        );
-
-        const editorOutputColumn = (
-            <div key="editor-output" className="flex flex-col space-y-2 min-h-0" style={{flex: '3 1 0%'}}>
-                <EditorPanel 
-                    actions={editorActions}
-                    activeTabId={activeTabId}
-                    openTabs={openTabs}
-                    fileSystem={fileSystem}
-                    problems={problems}
-                    settings={settings}
-                    onTabClick={setActiveTabId}
-                    onTabsReorder={setOpenTabs}
-                    onTabClose={handleSoftDelete}
-                    onCodeChange={updateCode}
-                    onNewFileClick={() => handleNewItem('file', 'root')}
-                />
-                <div className="flex-shrink-0 h-[250px]">
-                    <TabbedOutputPanel 
-                        tabs={ideToolTabs} 
-                        activeTabId={activeOutputTabId} 
-                        onTabClick={setActiveOutputTabId} 
-                        logs={logs}
-                        problems={problems}
-                        activeLanguage={activeLanguage}
-                        onApplyFix={handleApplyCodeFix}
-                    />
-                </div>
-            </div>
-        );
-
-        const previewInfoColumn = (
-            <div key="preview-info" className="flex flex-col space-y-2 min-h-0" style={{flex: '2 1 0%'}}>
-                <PrimaryDisplayPanel 
-                    controls={primaryDisplayControls} 
-                    currentFrame={currentStep} 
-                    totalFrames={executionStepsRef.current.length} 
-                    gameState={gameState}
-                    onMuteToggle={() => setMuted(!isMuted)}
-                    isMuted={isMuted}
-                    onShare={() => shareCode(code)}
-                    onFullscreen={() => toggleFullscreen('game-panel')}
-                />
-                <div className="flex-shrink-0 flex space-x-2 h-[220px]">
-                    <InfoCardListPanel cards={infoCardsData} />
-                    <UserDetailsPanel user={currentUser} onDeleteClick={() => alert('Delete user clicked!')} />
-                    <ActionButtonsPanel 
-                        title="Actions" 
-                        buttons={actionButtons} 
-                        onHelpClick={() => setHelpOpen(true)}
-                        isExecuting={isExecuting}
-                    />
-                </div>
-            </div>
-        );
-
-        switch (settings.layout) {
-            case 'code-focused':
-                // Preview | Code | Explorer
-                return [previewInfoColumn, editorOutputColumn, fileTreeColumn];
-            case 'preview-focused':
-                 // Code | Preview | Explorer
-                return [editorOutputColumn, previewInfoColumn, fileTreeColumn];
-            case 'default':
-            default:
-                // Explorer | Code | Preview
-                return [fileTreeColumn, editorOutputColumn, previewInfoColumn];
-        }
+    // FIX: Removed `key` prop from component definitions and changed type to React.ReactElement to fix TypeScript error.
+    // The key is now applied during rendering in `renderColumn`.
+    const panelComponentMap: Record<PanelComponentKey, React.ReactElement> = {
+      FileTreePanel: <FileTreePanel 
+        fileSystem={fileSystem}
+        setFileSystem={setFileSystem}
+        openTabs={openTabs}
+        setOpenTabs={setOpenTabs}
+        activeTabId={activeTabId}
+        setActiveTabId={setActiveTabId}
+        onNewItem={handleNewItem}
+        onSoftDelete={handleSoftDelete}
+        onPermanentDelete={handlePermanentDelete}
+        onRestore={handleRestore}
+      />,
+      EditorPanel: <EditorPanel 
+        actions={editorActions}
+        activeTabId={activeTabId}
+        openTabs={openTabs}
+        fileSystem={fileSystem}
+        problems={problems}
+        settings={settings}
+        onTabClick={setActiveTabId}
+        onTabsReorder={setOpenTabs}
+        onTabClose={handleSoftDelete}
+        onCodeChange={updateCode}
+        onNewFileClick={() => handleNewItem('file', 'root')}
+      />,
+      TabbedOutputPanel: <div className="flex-shrink-0 h-[250px]"><TabbedOutputPanel 
+        tabs={ideToolTabs} 
+        activeTabId={activeOutputTabId} 
+        onTabClick={setActiveOutputTabId} 
+        logs={logs}
+        problems={problems}
+        activeLanguage={activeLanguage}
+        onApplyFix={handleApplyCodeFix}
+      /></div>,
+      PrimaryDisplayPanel: <PrimaryDisplayPanel 
+        controls={primaryDisplayControls} 
+        currentFrame={currentStep} 
+        totalFrames={executionStepsRef.current.length} 
+        gameState={gameState}
+        onMuteToggle={() => setMuted(!isMuted)}
+        isMuted={isMuted}
+        onShare={() => shareCode(code)}
+        onFullscreen={() => toggleFullscreen('game-panel')}
+      />,
+      InfoCardListPanel: <InfoCardListPanel cards={infoCardsData} />,
+      UserDetailsPanel: <UserDetailsPanel user={currentUser} onDeleteClick={() => alert('Delete user clicked!')} />,
+      ActionButtonsPanel: <ActionButtonsPanel 
+        title="Actions" 
+        buttons={actionButtons} 
+        onHelpClick={() => setHelpOpen(true)}
+        isExecuting={isExecuting}
+      />,
+      AIChatPanel: <AIChatPanel
+        messages={aiChatHistory}
+        onSendMessage={handleSendAiChatMessage}
+        isLoading={isAiAssistantLoading}
+       />,
     };
+
+    const codeFocusedLayout: PanelLayout = {
+      left: ['PrimaryDisplayPanel', 'InfoCardListPanel', 'UserDetailsPanel', 'ActionButtonsPanel'],
+      middle: ['EditorPanel', 'TabbedOutputPanel'],
+      right: ['FileTreePanel', 'AIChatPanel']
+    };
+
+    const previewFocusedLayout: PanelLayout = {
+      left: ['EditorPanel', 'TabbedOutputPanel'],
+      middle: ['PrimaryDisplayPanel', 'InfoCardListPanel', 'UserDetailsPanel', 'ActionButtonsPanel'],
+      right: ['FileTreePanel', 'AIChatPanel']
+    };
+
+    let currentLayout: PanelLayout;
+    switch (settings.layout) {
+      case 'code-focused':
+        currentLayout = codeFocusedLayout;
+        break;
+      case 'preview-focused':
+        currentLayout = previewFocusedLayout;
+        break;
+      case 'custom':
+        currentLayout = settings.customLayout;
+        break;
+      case 'default':
+      default:
+        currentLayout = defaultLayout;
+        break;
+    }
+
+    const renderColumn = (panels: PanelComponentKey[], flex: string, key: string) => {
+      const renderedPanels: React.ReactNode[] = [];
+      let i = 0;
+      while (i < panels.length) {
+        const panelKey = panels[i];
+        const isSidePanel = ['InfoCardListPanel', 'UserDetailsPanel', 'ActionButtonsPanel'].includes(panelKey);
+
+        if (isSidePanel) {
+          const group: React.ReactNode[] = [];
+          while (i < panels.length && ['InfoCardListPanel', 'UserDetailsPanel', 'ActionButtonsPanel'].includes(panels[i])) {
+            const currentPanelKey = panels[i];
+            group.push(React.cloneElement(panelComponentMap[currentPanelKey], { key: currentPanelKey }));
+            i++;
+          }
+          renderedPanels.push(<div key={`side-panel-group-${i}`} className="flex-shrink-0 flex space-x-2 h-[220px]">{group}</div>);
+        } else {
+          renderedPanels.push(React.cloneElement(panelComponentMap[panelKey], { key: panelKey }));
+          i++;
+        }
+      }
+      return <div key={key} className="flex flex-col space-y-2 min-h-0" style={{ flex }}>{renderedPanels}</div>
+    };
+    
+    return [
+      renderColumn(currentLayout.left, '1 1 200px', 'left-column'),
+      renderColumn(currentLayout.middle, '3 1 500px', 'middle-column'),
+      renderColumn(currentLayout.right, '2 1 300px', 'right-column'),
+    ];
+};
 
 
   return (
@@ -667,6 +838,21 @@ const App: React.FC = () => {
           settings={settings}
           setSettings={setSettings}
           onClose={() => setSettingsOpen(false)} 
+          onCustomizeLayout={() => {
+              setSettingsOpen(false);
+              setLayoutCustomizationActive(true);
+          }}
+      />}
+       {isLayoutCustomizationActive && <LayoutCustomizer 
+          initialLayout={settings.customLayout}
+          onSave={(newLayout) => {
+              setSettings(produce(draft => {
+                  draft.customLayout = newLayout;
+                  draft.layout = 'custom';
+              }));
+              setLayoutCustomizationActive(false);
+          }}
+          onClose={() => setLayoutCustomizationActive(false)}
       />}
       {newItemModal && <NewItemModal 
           type={newItemModal.type} 
@@ -675,6 +861,13 @@ const App: React.FC = () => {
           onCreate={handleCreateItem}
           fileSystem={fileSystem}
       />}
+       {confirmation && (
+          <ConfirmationModal
+              message={confirmation.message}
+              onConfirm={confirmation.onConfirm}
+              onCancel={confirmation.onCancel}
+          />
+      )}
       <div className="h-screen w-screen flex flex-col font-sans text-sm">
         <main className="flex-grow p-2 flex space-x-2 overflow-hidden">
           {renderLayout()}

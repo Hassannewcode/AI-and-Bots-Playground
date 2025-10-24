@@ -1,10 +1,11 @@
+
 import { Sprite, ExecutionResult, Problem, ExecutionStep, FileSystemTree } from './types';
 import { nanoid } from 'nanoid';
 
 let pyodideDirectPromise: Promise<any> | null = null;
 let pyodideViaPyScriptPromise: Promise<any> | null = null;
 
-function loadScript(url: string, id: string): Promise<void> {
+function loadScript(url: string, id: string, type?: string): Promise<void> {
     return new Promise((resolve, reject) => {
         if (document.getElementById(id)) {
             resolve();
@@ -13,6 +14,10 @@ function loadScript(url: string, id: string): Promise<void> {
         const script = document.createElement('script');
         script.src = url;
         script.id = id;
+        if (type) {
+            script.type = type;
+        }
+        script.crossOrigin = 'anonymous';
         script.onload = () => resolve();
         script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
         document.head.appendChild(script);
@@ -23,22 +28,36 @@ async function getPyodideDirectly() {
     if (pyodideDirectPromise) return pyodideDirectPromise;
 
     pyodideDirectPromise = (async () => {
-        await loadScript('https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js', 'pyodide-script');
+        // Temporarily disable the AMD loader `define` function to prevent conflicts
+        // between Monaco's loader and Pyodide.
         // @ts-ignore
-        console.log("Loading Pyodide directly...");
+        const holdDefine = window.define;
         // @ts-ignore
-        const pyodide = await window.loadPyodide();
-        console.log("Pyodide loaded directly.");
-        return pyodide;
+        window.define = undefined; // Undefine it before the try block to cover all async operations.
+
+        try {
+            await loadScript('https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js', 'pyodide-script');
+
+            console.log("Loading Pyodide directly...");
+            // @ts-ignore
+            const pyodide = await window.loadPyodide(); // Initialize INSIDE the try block
+            console.log("Pyodide loaded directly.");
+            return pyodide;
+        } finally {
+            // Restore the original define function. This is crucial for Monaco to work.
+            // @ts-ignore
+            window.define = holdDefine;
+        }
     })();
     return pyodideDirectPromise;
 }
+
 
 async function getPyodideViaPyScript() {
     if (pyodideViaPyScriptPromise) return pyodideViaPyScriptPromise;
 
     pyodideViaPyScriptPromise = (async () => {
-        await loadScript('https://pyscript.net/releases/2024.1.1/core.js', 'pyscript-script');
+        await loadScript('https://pyscript.net/releases/2024.1.1/core.js', 'pyscript-script', 'module');
         
         console.log("Loading Pyodide via PyScript...");
         // Poll for pyscript to be ready
@@ -217,7 +236,7 @@ export async function executePythonCode(code: string, fileSystem: FileSystemTree
         const errorMessage = e.message || "An unknown Python error occurred.";
         const tracebackRegex = /File "<exec>", line (\d+)/;
         const match = errorMessage.match(tracebackRegex);
-        const line = match ? parseInt(match[1], 10) : 0;
+        const line = match ? parseInt(match[1], 10) : 1;
         
         problems.push({ fileId, line, message: errorMessage, code, language: 'py' });
         logs.push(`Execution failed.`);

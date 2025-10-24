@@ -1,3 +1,4 @@
+
 import type { Suggestion, SuggestionType } from '../game/types';
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -311,7 +312,11 @@ ${codeWithCursor}
         return [];
 
     } catch (error) {
-        console.error("Error getting code completion from Gemini API:", error);
+        if (error instanceof Error && error.message.includes('429')) {
+             console.warn("Code completion request rate-limited by Gemini API. Please wait and try again.");
+        } else {
+             console.error("Error getting code completion from Gemini API:", error);
+        }
         return [];
     }
 };

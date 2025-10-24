@@ -121,3 +121,20 @@ export interface Suggestion {
   type: SuggestionType;
   detail?: string;
 }
+
+// Layout Engine Types
+export type PanelComponentKey = 
+  | 'FileTreePanel' 
+  | 'EditorPanel' 
+  | 'TabbedOutputPanel' 
+  | 'PrimaryDisplayPanel' 
+  | 'InfoCardListPanel' 
+  | 'UserDetailsPanel' 
+  | 'ActionButtonsPanel'
+  | 'AIChatPanel';
+
+export interface PanelLayout {
+  left: PanelComponentKey[];
+  middle: PanelComponentKey[];
+  right: PanelComponentKey[];
+}

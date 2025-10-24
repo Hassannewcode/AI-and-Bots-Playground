@@ -1,4 +1,3 @@
-
 import { Sprite, Prop, ExecutionResult, Problem, ExecutionStep, FileSystemTree, Zone } from './types';
 import { nanoid } from 'nanoid';
 
@@ -173,10 +172,10 @@ export async function executeJavaScriptCode(code: string, fileSystem: FileSystem
         
         const stackLine = error.stack?.split('\n')[1] || '';
         const lineMatch = stackLine.match(/<anonymous>:(\d+):(\d+)/);
-        // Adjust line number for the prepended "use strict" line.
-        const line = lineMatch ? parseInt(lineMatch[1], 10) - 1 : 0; 
+        // Adjust for "use strict" and ensure line number is at least 1 for Monaco.
+        const line = lineMatch ? Math.max(1, parseInt(lineMatch[1], 10) - 1) : 1;
 
-        problems.push({ fileId, line: Math.max(0, line), message, code, language: 'js' });
+        problems.push({ fileId, line, message, code, language: 'js' });
         logs.push(`Execution failed.`);
     }
 

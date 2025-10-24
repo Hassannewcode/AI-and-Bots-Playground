@@ -240,7 +240,7 @@ export const FileTreePanel = ({ fileSystem, setFileSystem, openTabs, setOpenTabs
     if (!rootNode || rootNode.type !== 'folder') return null;
 
     return (
-        <div className="flex-grow w-[180px] flex-shrink-0 bg-[#272a33] rounded-sm flex flex-col border border-[#3a3d46]">
+        <div className="flex-grow bg-[#272a33] rounded-sm flex flex-col border border-[#3a3d46]">
             <div 
               className="p-2 border-b border-[#3a3d46]"
               onContextMenu={(e) => handleContextMenu(e, rootNode)}
