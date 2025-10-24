@@ -8,7 +8,7 @@ const JS_AIGuide: React.FC = () => (
                 <span className="token-keyword">const</span> <span className="token-variable">bot</span> = ai.Sprite({'{'} name: <span className="token-string">"J-5"</span>, shape: <span className="token-string">"user"</span>, x: <span className="token-number">10</span>, y: <span className="token-number">10</span> {'}'});
             </CodeLine>
             <CodeLine comment="Pauses the simulation for a number of seconds.">
-                ai.wait({'{'} seconds: <span className="token-number">1.5</span> {'}'});
+                ai.wait(<span className="token-number">1.5</span>);
             </CodeLine>
         </GuideSection>
         <GuideSection title="Sprite Methods">
@@ -45,6 +45,14 @@ const JS_WorldGuide: React.FC = () => (
     </GuideSection>
 );
 
+const JS_PhysicsGuide: React.FC = () => (
+     <GuideSection title="The 'physics' Library">
+        <CodeLine comment="Sets the gravitational pull for all sprites. Positive values pull down.">
+            physics.set_gravity({'{'} strength: <span className="token-number">0.005</span> {'}'});
+        </CodeLine>
+    </GuideSection>
+);
+
 const JS_SoundGuide: React.FC = () => (
      <GuideSection title="The 'sound' Library">
         <CodeLine comment="Creates a visual sound wave effect at a specific x, y coordinate.">
@@ -72,6 +80,7 @@ export const JavaScriptGuide: React.FC = () => (
 
         <JS_AIGuide />
         <JS_WorldGuide />
+        <JS_PhysicsGuide />
         <JS_SoundGuide />
     </div>
 );

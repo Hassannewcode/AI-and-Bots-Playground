@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import CodeEditor from '../editor/CodeEditor';
 import type { FileSystemTree, Problem } from '../../game/types';
@@ -77,6 +75,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
       setDropIndicatorIndex(null);
   };
 
+  const activeFileProblems = problems.filter(p => p.fileId === activeTabId);
 
   return (
     <div className="flex-grow bg-[#1e2026] rounded-lg flex flex-col text-sm font-mono border border-[#3a3d46]">
@@ -138,7 +137,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
               code={code} 
               onCodeChange={onCodeChange} 
               language={activeLanguage}
-              problems={problems}
+              problems={activeFileProblems}
               settings={settings}
             />
         ) : (

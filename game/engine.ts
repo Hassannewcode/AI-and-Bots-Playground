@@ -59,7 +59,7 @@ export async function parseCode(code: string, fileSystem: FileSystemTree, langua
             break;
         case 'js':
         case 'jsx':
-            scriptResult = executeJavaScriptCode(code, fileSystem, fileId);
+            scriptResult = await executeJavaScriptCode(code, fileSystem, fileId);
             break;
         case 'html':
             scriptResult = {

@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { produce } from 'immer';
 
+type LayoutOption = 'default' | 'code-focused' | 'preview-focused';
+
 interface Settings {
     pythonEngine: 'pyodide' | 'pyscript';
+    layout: LayoutOption;
     keybindings: {
         acceptSuggestion: string;
         acceptAiCompletion: string;
@@ -112,6 +115,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, settings, setSet
                     >
                         Runtimes
                     </button>
+                    <button
+                        onClick={() => setActiveTab('layout')}
+                        className={`px-4 py-2 transition-colors ${activeTab === 'layout' ? 'text-white border-b-2 border-teal-500' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        Layout
+                    </button>
                 </div>
 
                 <div className="mt-6">
@@ -145,6 +154,35 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, settings, setSet
                                 checked={settings.pythonEngine === 'pyscript'}
                                 onChange={() => setSettings(produce(draft => { draft.pythonEngine = 'pyscript'; }))}
                             />
+                            </div>
+                        </div>
+                    )}
+                    {activeTab === 'layout' && (
+                         <div>
+                            <h3 className="text-md font-bold text-white mb-2">IDE Layout</h3>
+                            <p className="text-xs text-gray-400 mb-4">Choose how to arrange the main panels in the editor.</p>
+                            <div className="space-y-3">
+                                <RadioOption
+                                    label="Default"
+                                    description="Explorer | Code & Output | Preview & Info"
+                                    value="default"
+                                    checked={settings.layout === 'default'}
+                                    onChange={() => setSettings(produce(draft => { draft.layout = 'default'; }))}
+                                />
+                                <RadioOption
+                                    label="Code Focused"
+                                    description="Preview & Info | Code & Output | Explorer"
+                                    value="code-focused"
+                                    checked={settings.layout === 'code-focused'}
+                                    onChange={() => setSettings(produce(draft => { draft.layout = 'code-focused'; }))}
+                                />
+                                <RadioOption
+                                    label="Preview Focused"
+                                    description="Code & Output | Preview & Info | Explorer"
+                                    value="preview-focused"
+                                    checked={settings.layout === 'preview-focused'}
+                                    onChange={() => setSettings(produce(draft => { draft.layout = 'preview-focused'; }))}
+                                />
                             </div>
                         </div>
                     )}

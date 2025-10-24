@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { produce } from 'immer';
 import { nanoid } from 'nanoid';
@@ -27,7 +28,7 @@ import {
 import { getIconForShape } from './components/icons';
 
 const initialFiles: FileSystemTree = {
-  'root': { id: 'root', name: 'root', type: 'folder', children: ['readme_md', 'main_py', 'world_html'] },
+  'root': { id: 'root', name: 'root', type: 'folder', children: ['main_py', 'world_html', 'readme_md'] },
   'main_py': { 
     id: 'main_py', 
     name: 'main.py', 
@@ -91,18 +92,6 @@ const initialFiles: FileSystemTree = {
   }
 };
 
-const useDebouncedAsyncCallback = (callback: (...args: any[]) => Promise<void>, delay: number) => {
-  const timeoutRef = useRef<number | null>(null);
-  return useCallback((...args: any[]) => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    timeoutRef.current = window.setTimeout(async () => {
-      await callback(...args);
-    }, delay);
-  }, [callback, delay]);
-};
-
 const initialGameState: GameState = { 
     sprites: [], 
     props: [], 
@@ -123,8 +112,8 @@ const App: React.FC = () => {
   const [activeOutputTabId, setActiveOutputTabId] = useState('console');
 
   const [fileSystem, setFileSystem] = useState<FileSystemTree>(initialFiles);
-  const [openTabs, setOpenTabs] = useState<string[]>(['readme_md', 'main_py', 'world_html']);
-  const [activeTabId, setActiveTabId] = useState<string>('readme_md');
+  const [openTabs, setOpenTabs] = useState<string[]>(['main_py', 'world_html', 'readme_md']);
+  const [activeTabId, setActiveTabId] = useState<string>('main_py');
 
   const executionStepsRef = useRef<ExecutionStep[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
@@ -139,6 +128,7 @@ const App: React.FC = () => {
 
   const [settings, setSettings] = useState({
     pythonEngine: 'pyodide' as 'pyodide' | 'pyscript',
+    layout: 'default' as 'default' | 'code-focused' | 'preview-focused',
     keybindings: {
         acceptSuggestion: 'Tab',
         acceptAiCompletion: 'Tab',
@@ -293,57 +283,6 @@ const App: React.FC = () => {
     };
   }, [isRunning, runNextStep]);
   
-  const updatePreview = useDebouncedAsyncCallback(async (codeToParse: string, fs: FileSystemTree, lang: string, fileId: string) => {
-      setIsExecuting(true);
-      try {
-        const { steps, problems: compileProblems, logs: compileLogs } = await parseCode(codeToParse, fs, lang, fileId, settings.pythonEngine);
-        
-        const problemsWithCodeContext = compileProblems.map(p => ({ ...p, code: codeToParse, language: lang }));
-        setProblems(problemsWithCodeContext);
-        executionStepsRef.current = steps;
-
-        const previewState = produce(initialGameState, draft => {
-          for (const step of steps) {
-              if (step.type === 'CREATE_SPRITE') draft.sprites.push(step.sprite);
-              if (step.type === 'CREATE_PROP') draft.props.push(step.prop);
-              if (step.type === 'SET_BACKGROUND') draft.worldState.backgroundColor = step.color;
-              if (step.type === 'SPRITE_CREATE_NETWORK') {
-                  const sprite = draft.sprites.find(s => s.id === step.spriteId);
-                  if (sprite) sprite.brain = { rewards: 0 };
-              }
-          }
-        });
-        setGameState(previewState);
-
-        if (compileProblems.length > 0 && activeOutputTabId !== 'guide') {
-          setActiveOutputTabId('problems');
-        }
-      } catch (e) {
-          console.error("Critical error during code parsing:", e);
-          const errorMessage = e instanceof Error ? e.message : "An unknown parsing error occurred.";
-          setProblems([{ fileId, line: 0, message: `Fatal Parser Error: ${errorMessage}`, code: codeToParse, language: lang }]);
-          setGameState(initialGameState);
-          executionStepsRef.current = [];
-          if (activeOutputTabId !== 'guide') {
-            setActiveOutputTabId('problems');
-          }
-      } finally {
-          setIsExecuting(false);
-      }
-  }, 500);
-
-  useEffect(() => {
-    // Live preview for runnable files only
-    if (activeFile?.type === 'file' && (activeFile.name.endsWith('.py') || activeFile.name.endsWith('.js'))) {
-        updatePreview(activeFile.code, fileSystem, activeLanguage, activeTabId);
-    } else {
-        // For non-runnable files like HTML or MD, just clear problems and steps
-        setProblems([]);
-        executionStepsRef.current = [];
-        // Optional: you could have a separate "live preview" for HTML files here
-    }
-  }, [activeFile?.code, fileSystem, activeLanguage, activeTabId, updatePreview, settings.pythonEngine]);
-
   const resetSimulation = async () => {
     setIsRunning(false);
     if (runnerTimeoutRef.current) clearTimeout(runnerTimeoutRef.current);
@@ -392,6 +331,17 @@ const App: React.FC = () => {
             return;
         }
         executionStepsRef.current = steps;
+        
+        // This is a new step: set the initial state from all CREATE_* steps before running
+        const previewState = produce(initialGameState, draft => {
+            for (const step of steps) {
+                if (step.type === 'CREATE_SPRITE') draft.sprites.push(step.sprite);
+                if (step.type === 'CREATE_PROP') draft.props.push(step.prop);
+                if (step.type === 'SET_BACKGROUND') draft.worldState.backgroundColor = step.color;
+            }
+        });
+        setGameState(previewState);
+
         startSimulation();
     } catch(e) {
         const errorMessage = e instanceof Error ? e.message : "An unknown execution error occurred.";
@@ -440,6 +390,9 @@ const App: React.FC = () => {
             const file = draft[activeTabId] as Extract<FileSystemNode, {type: 'file'}>;
             file.code = newCode;
         }));
+        // Since live validation is disabled, clear problems for the current file
+        // when the user edits it. They will reappear on the next run if they persist.
+        setProblems(prev => prev.filter(p => p.fileId !== activeTabId));
     }
   };
 
@@ -616,6 +569,96 @@ const App: React.FC = () => {
     { id: 'primary', text: 'Run This File', icon: <PlayIcon />, onClick: handleRunCurrentFile, style: 'primary' },
     { id: 'secondary', text: 'Run All Open Files', icon: <PlayIcon />, onClick: handleRunAllOpenFiles, style: 'secondary' },
   ];
+  
+  const renderLayout = () => {
+        const fileTreeColumn = (
+            // FIX: Wrap FileTreePanel in a React.Fragment to pass the `key` prop without causing a type error.
+            // The `key` is required because this element is part of an array returned by renderLayout.
+            // Fragments do not render to the DOM, preserving the flexbox layout.
+            <React.Fragment key="file-tree">
+                <FileTreePanel 
+                    fileSystem={fileSystem}
+                    setFileSystem={setFileSystem}
+                    openTabs={openTabs}
+                    setOpenTabs={setOpenTabs}
+                    activeTabId={activeTabId}
+                    setActiveTabId={setActiveTabId}
+                    onNewItem={handleNewItem}
+                    onSoftDelete={handleSoftDelete}
+                    onPermanentDelete={handlePermanentDelete}
+                    onRestore={handleRestore}
+                />
+            </React.Fragment>
+        );
+
+        const editorOutputColumn = (
+            <div key="editor-output" className="flex flex-col space-y-2 min-h-0" style={{flex: '3 1 0%'}}>
+                <EditorPanel 
+                    actions={editorActions}
+                    activeTabId={activeTabId}
+                    openTabs={openTabs}
+                    fileSystem={fileSystem}
+                    problems={problems}
+                    settings={settings}
+                    onTabClick={setActiveTabId}
+                    onTabsReorder={setOpenTabs}
+                    onTabClose={handleSoftDelete}
+                    onCodeChange={updateCode}
+                    onNewFileClick={() => handleNewItem('file', 'root')}
+                />
+                <div className="flex-shrink-0 h-[250px]">
+                    <TabbedOutputPanel 
+                        tabs={ideToolTabs} 
+                        activeTabId={activeOutputTabId} 
+                        onTabClick={setActiveOutputTabId} 
+                        logs={logs}
+                        problems={problems}
+                        activeLanguage={activeLanguage}
+                        onApplyFix={handleApplyCodeFix}
+                    />
+                </div>
+            </div>
+        );
+
+        const previewInfoColumn = (
+            <div key="preview-info" className="flex flex-col space-y-2 min-h-0" style={{flex: '2 1 0%'}}>
+                <PrimaryDisplayPanel 
+                    controls={primaryDisplayControls} 
+                    currentFrame={currentStep} 
+                    totalFrames={executionStepsRef.current.length} 
+                    gameState={gameState}
+                    onMuteToggle={() => setMuted(!isMuted)}
+                    isMuted={isMuted}
+                    onShare={() => shareCode(code)}
+                    onFullscreen={() => toggleFullscreen('game-panel')}
+                />
+                <div className="flex-shrink-0 flex space-x-2 h-[220px]">
+                    <InfoCardListPanel cards={infoCardsData} />
+                    <UserDetailsPanel user={currentUser} onDeleteClick={() => alert('Delete user clicked!')} />
+                    <ActionButtonsPanel 
+                        title="Actions" 
+                        buttons={actionButtons} 
+                        onHelpClick={() => setHelpOpen(true)}
+                        isExecuting={isExecuting}
+                    />
+                </div>
+            </div>
+        );
+
+        switch (settings.layout) {
+            case 'code-focused':
+                // Preview | Code | Explorer
+                return [previewInfoColumn, editorOutputColumn, fileTreeColumn];
+            case 'preview-focused':
+                 // Code | Preview | Explorer
+                return [editorOutputColumn, previewInfoColumn, fileTreeColumn];
+            case 'default':
+            default:
+                // Explorer | Code | Preview
+                return [fileTreeColumn, editorOutputColumn, previewInfoColumn];
+        }
+    };
+
 
   return (
     <>
@@ -634,70 +677,7 @@ const App: React.FC = () => {
       />}
       <div className="h-screen w-screen flex flex-col font-sans text-sm">
         <main className="flex-grow p-2 flex space-x-2 overflow-hidden">
-          
-          <FileTreePanel 
-            fileSystem={fileSystem}
-            setFileSystem={setFileSystem}
-            openTabs={openTabs}
-            setOpenTabs={setOpenTabs}
-            activeTabId={activeTabId}
-            setActiveTabId={setActiveTabId}
-            onNewItem={handleNewItem}
-            onSoftDelete={handleSoftDelete}
-            onPermanentDelete={handlePermanentDelete}
-            onRestore={handleRestore}
-          />
-          
-          <div className="flex flex-col space-y-2 min-h-0" style={{flex: '2 1 0%'}}>
-            <PrimaryDisplayPanel 
-                controls={primaryDisplayControls} 
-                currentFrame={currentStep} 
-                totalFrames={executionStepsRef.current.length} 
-                gameState={gameState}
-                onMuteToggle={() => setMuted(!isMuted)}
-                isMuted={isMuted}
-                onShare={() => shareCode(code)}
-                onFullscreen={() => toggleFullscreen('game-panel')}
-            />
-            <div className="flex-shrink-0 h-[250px]">
-                <TabbedOutputPanel 
-                    tabs={ideToolTabs} 
-                    activeTabId={activeOutputTabId} 
-                    onTabClick={setActiveOutputTabId} 
-                    logs={logs}
-                    problems={problems}
-                    activeLanguage={activeLanguage}
-                    onApplyFix={handleApplyCodeFix}
-                />
-            </div>
-          </div>
-          
-          <div className="flex flex-col space-y-2 min-h-0" style={{flex: '3 1 0%'}}>
-              <EditorPanel 
-                actions={editorActions}
-                activeTabId={activeTabId}
-                openTabs={openTabs}
-                fileSystem={fileSystem}
-                problems={problems}
-                settings={settings}
-                onTabClick={setActiveTabId}
-                onTabsReorder={setOpenTabs}
-                onTabClose={handleSoftDelete}
-                onCodeChange={updateCode}
-                onNewFileClick={() => handleNewItem('file', 'root')}
-              />
-              <div className="flex-shrink-0 flex space-x-2 h-[220px]">
-                  <InfoCardListPanel cards={infoCardsData} />
-                  <UserDetailsPanel user={currentUser} onDeleteClick={() => alert('Delete user clicked!')} />
-                  <ActionButtonsPanel 
-                      title="Actions" 
-                      buttons={actionButtons} 
-                      onHelpClick={() => setHelpOpen(true)}
-                      isExecuting={isExecuting}
-                  />
-              </div>
-          </div>
-
+          {renderLayout()}
         </main>
       </div>
     </>

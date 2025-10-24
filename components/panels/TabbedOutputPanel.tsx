@@ -70,7 +70,7 @@ const AIFixComponent: React.FC<{ problem: Problem, onApplyFix: (fileId: string, 
                     className="px-2 py-0.5 text-xs bg-sky-800 hover:bg-sky-700 text-sky-200 rounded-md flex items-center"
                 >
                     {isLoading ? <ArrowPathIcon className="w-4 h-4 animate-spin mr-1" /> : null}
-                    {isLoading ? 'Thinking...' : 'Get AI Fix'}
+                    {isLoading ? 'Thinking...' : '✨ Get AI Fix'}
                 </button>
             )}
              {error && <div className="ml-4 text-xs text-amber-500">{error}</div>}
@@ -96,7 +96,7 @@ export const TabbedOutputPanel: React.FC<TabbedOutputPanelProps> = ({
       ))}
     </div>
     <div className="flex-grow p-2 bg-[#1e2026] font-mono text-xs text-gray-400 overflow-y-auto">
-        {activeTabId === 'console' && logs.map((log, index) => <div key={index} className="whitespace-pre-wrap">{`> ${log}`}</div>)}
+        {activeTabId === 'console' && logs.map((log, index) => <div key={index} className="whitespace-pre-wrap break-words break-all">{`> ${log}`}</div>)}
         {activeTabId === 'problems' && (
             problems.length > 0 
                 ? problems.map((p, i) => (
@@ -104,7 +104,7 @@ export const TabbedOutputPanel: React.FC<TabbedOutputPanelProps> = ({
                         <div className="text-red-400 flex items-start">
                             <span className="w-10 text-right pr-2 text-gray-500 flex-shrink-0 pt-0.5">{p.line}</span>
                             <div className="flex-grow">
-                                <span className="pt-0.5 block">{p.message}</span>
+                                <span className="pt-0.5 block whitespace-pre-wrap break-words break-all">{p.message}</span>
                                 <AIFixComponent problem={p} onApplyFix={onApplyFix} />
                             </div>
                         </div>
