@@ -18,6 +18,7 @@ import { ActionButtonsPanel } from './components/panels/ActionButtonsPanel';
 import HelpModal from './components/modals/HelpModal';
 import SettingsModal from './components/modals/SettingsModal';
 import NewItemModal from './components/modals/NewItemModal';
+import { FileTreePanel } from './components/panels/FileTreePanel';
 
 // Icons
 import { 
@@ -538,6 +539,15 @@ const App: React.FC = () => {
       />}
       <div className="h-screen w-screen flex flex-col bg-[#181a20] text-gray-300 font-sans text-sm">
         <main className="flex-grow p-2 flex space-x-2 overflow-hidden">
+          
+          <FileTreePanel 
+            fileSystem={fileSystem}
+            setFileSystem={setFileSystem}
+            openTabs={openTabs}
+            setOpenTabs={setOpenTabs}
+            setActiveTabId={setActiveTabId}
+            onNewItem={handleNewItem}
+          />
           
           <div className="flex flex-col space-y-2 min-h-0" style={{flex: '2 1 0%'}}>
             <PrimaryDisplayPanel 

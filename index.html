@@ -25,6 +25,13 @@
 </head>
   <body class="bg-[#181a20]">
     <div id="root"></div>
+    <!-- 
+      NOTE FOR PRODUCTION:
+      This setup uses the in-browser Babel transformer for development convenience.
+      For a production deployment, it is highly recommended to pre-compile scripts 
+      into standard JavaScript for better performance and browser compatibility.
+      See: https://babeljs.io/docs/setup/
+    -->
     <!-- Load and transform the main application script -->
     <script type="text/babel" data-type="module" src="./index.tsx"></script>
   </body>

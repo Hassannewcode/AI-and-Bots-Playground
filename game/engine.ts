@@ -1,4 +1,4 @@
-import { GameState, Sprite, ExecutionResult, Problem, ExecutionStep, FileSystemTree } from './types';
+import { ExecutionResult, FileSystemTree } from './types';
 import { nanoid } from 'nanoid';
 import { parseUniversalCode } from './universal_engine';
 
