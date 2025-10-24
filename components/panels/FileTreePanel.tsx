@@ -1,11 +1,10 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
 import type { FileSystemTree, FileSystemNode } from '../../game/types';
 import { produce } from 'immer';
 import { FolderIcon, FileIcon, ChevronRightIcon, ChevronDownIcon } from '../icons';
 
-interface FileTreePanelProps {
+export interface FileTreePanelProps {
     fileSystem: FileSystemTree;
     setFileSystem: React.Dispatch<React.SetStateAction<FileSystemTree>>;
     openTabs: string[];
@@ -183,7 +182,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
     );
 };
 
-export const FileTreePanel = ({ fileSystem, setFileSystem, openTabs, setOpenTabs, activeTabId, setActiveTabId, onNewItem, onSoftDelete, onPermanentDelete, onRestore }: FileTreePanelProps) => {
+export const FileTreePanel: React.FC<FileTreePanelProps> = ({ fileSystem, setFileSystem, openTabs, setOpenTabs, activeTabId, setActiveTabId, onNewItem, onSoftDelete, onPermanentDelete, onRestore }) => {
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, nodeId: string } | null>(null);
     const [currentTime, setCurrentTime] = useState(Date.now());
 
@@ -240,28 +239,20 @@ export const FileTreePanel = ({ fileSystem, setFileSystem, openTabs, setOpenTabs
     if (!rootNode || rootNode.type !== 'folder') return null;
 
     return (
-        <div className="flex-grow bg-[#272a33] rounded-sm flex flex-col border border-[#3a3d46]">
-            <div 
-              className="p-2 border-b border-[#3a3d46]"
-              onContextMenu={(e) => handleContextMenu(e, rootNode)}
-            >
-              <h2 className="text-gray-400 font-semibold text-xs uppercase tracking-wider">Explorer</h2>
-            </div>
-            <div className="flex-grow overflow-y-auto">
-                {rootNode.children.map(nodeId => (
-                    <NodeComponent 
-                        key={nodeId} 
-                        nodeId={nodeId} 
-                        fileSystem={fileSystem} 
-                        level={0} 
-                        onNodeClick={handleNodeClick}
-                        onContextMenu={handleContextMenu}
-                        onRename={handleRename}
-                        currentTime={currentTime}
-                        onRestore={onRestore}
-                    />
-                ))}
-            </div>
+        <div className="h-full" onContextMenu={(e) => handleContextMenu(e, rootNode)}>
+            {rootNode.children.map(nodeId => (
+                <NodeComponent 
+                    key={nodeId} 
+                    nodeId={nodeId} 
+                    fileSystem={fileSystem} 
+                    level={0} 
+                    onNodeClick={handleNodeClick}
+                    onContextMenu={handleContextMenu}
+                    onRename={handleRename}
+                    currentTime={currentTime}
+                    onRestore={onRestore}
+                />
+            ))}
             {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} options={contextOptions()} onClose={() => setContextMenu(null)} />}
         </div>
     );

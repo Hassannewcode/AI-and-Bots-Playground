@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, FunctionDeclaration, Chat } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const model = 'gemini-2.5-flash';
 
@@ -48,6 +48,44 @@ export const getGeminiResponse = async (
         throw new Error("An unknown error occurred while calling the Gemini API.");
     }
 };
+
+export const getAiThought = async (spriteName: string, rewardValue: number): Promise<string> => {
+    if (!process.env.API_KEY) {
+        console.error("API_KEY is not configured for AI thought generation.");
+        return "..."; // Return a placeholder
+    }
+
+    const mood = rewardValue > 0 ? "happy or confident" : (rewardValue < 0 ? "confused or determined to do better" : "neutral or observant");
+
+    const prompt = `A sprite character in a game named "${spriteName}" just received a reward of ${rewardValue}.
+Generate a single, short, first-person sentence reflecting what the sprite might be thinking.
+The thought should be ${mood}.
+The thought should be concise and in-character, like something you'd see in a game. Do not use quotes in the response.`;
+
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                temperature: 0.8,
+                maxOutputTokens: 50,
+            }
+        });
+
+        const text = response.text;
+        if (!text) {
+            return "...";
+        }
+        return text.trim().replace(/"/g, ''); // Ensure no quotes
+
+    } catch (error) {
+        console.error("Error generating AI thought:", error);
+        return "..."; // Return placeholder on error
+    }
+};
+
 
 export const getFixForCodeError = async (
     code: string,
@@ -136,103 +174,4 @@ ${code}
         console.error("Error getting code fix from Gemini API:", error);
         throw new Error("AI failed to generate a fix. The model's response might have been blocked or the API key is invalid.");
     }
-};
-
-
-// AI Assistant with Function Calling
-
-const tools: FunctionDeclaration[] = [
-    {
-        name: 'listAllFiles',
-        description: 'List all files and folders in the workspace explorer.',
-        parameters: { type: Type.OBJECT, properties: {} }
-    },
-    {
-        name: 'readFile',
-        description: 'Reads the entire content of a specific file.',
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                fileName: { type: Type.STRING, description: 'The full name of the file to read, e.g., "main.py".' },
-            },
-            required: ['fileName']
-        }
-    },
-    {
-        name: 'getActiveFileContent',
-        description: 'Reads the content of the file currently open in the editor.',
-        parameters: { type: Type.OBJECT, properties: {} }
-    },
-    {
-        name: 'createFile',
-        description: 'Creates a new file in the root directory.',
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                fileName: { type: Type.STRING, description: 'The name for the new file, including extension, e.g., "utils.py".' },
-            },
-            required: ['fileName']
-        }
-    },
-    {
-        name: 'deleteFile',
-        description: 'Deletes a file from the workspace. This action requires user confirmation.',
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                fileName: { type: Type.STRING, description: 'The full name of the file to delete.' },
-            },
-            required: ['fileName']
-        }
-    },
-    {
-        name: 'renameFile',
-        description: 'Renames a file.',
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                oldFileName: { type: Type.STRING, description: 'The current full name of the file.' },
-                newFileName: { type: Type.STRING, description: 'The new full name for the file.' },
-            },
-            required: ['oldFileName', 'newFileName']
-        }
-    },
-    {
-        name: 'replaceCodeInRange',
-        description: 'Replaces a range of lines in a specific file with new code. Use this for precise edits.',
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                fileName: { type: Type.STRING, description: 'The name of the file to edit.' },
-                startLine: { type: Type.INTEGER, description: 'The 1-based starting line number of the code to replace.' },
-                endLine: { type: Type.INTEGER, description: 'The 1-based ending line number of the code to replace.' },
-                newCode: { type: Type.STRING, description: 'The new code to insert.' },
-            },
-            required: ['fileName', 'startLine', 'endLine', 'newCode']
-        }
-    }
-];
-
-export const createAssistantChatSession = (): Chat => {
-    if (!process.env.API_KEY) {
-        throw new Error("API_KEY is not configured for the AI assistant.");
-    }
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    
-    const systemInstruction = `You are a world-class senior software engineer acting as an AI assistant in a web-based IDE. Your name is Coder.
-You are helpful, concise, and an expert in multiple programming languages.
-You can read, create, and modify files in the user's workspace by calling the provided functions.
-When asked to delete a file, you MUST call the 'deleteFile' function, which will prompt the user for confirmation.
-Before modifying a file, it's a good practice to read it first to understand its contents.
-When a user asks you to make a code change, try to use the 'replaceCodeInRange' function for precision.
-Do not ask for confirmation for actions unless it is for a destructive action like deleting a file. Just perform the action.`;
-
-    return ai.chats.create({
-        model: 'gemini-2.5-pro',
-        config: {
-            systemInstruction: systemInstruction,
-            tools: [{ functionDeclarations: tools }],
-            topK: 32,
-        },
-    });
 };

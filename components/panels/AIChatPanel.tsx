@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Content, FunctionCall } from '@google/genai';
 import { SparklesIcon, ArrowPathIcon } from '../icons';
+import type { AIStateStatus } from '../../ai/types';
 
-interface AIChatPanelProps {
+export interface AIChatPanelProps {
     messages: Content[];
     onSendMessage: (message: string) => void;
-    isLoading: boolean;
+    aiState: AIStateStatus;
 }
 
 const formatToolCall = (call: FunctionCall) => {
@@ -15,15 +16,16 @@ const formatToolCall = (call: FunctionCall) => {
     return `${call.name}({ ${args} })`;
 };
 
-export const AIChatPanel: React.FC<AIChatPanelProps> = ({ messages, onSendMessage, isLoading }) => {
+export const AIChatPanel: React.FC<AIChatPanelProps> = ({ messages, onSendMessage, aiState }) => {
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const isLoading = aiState.state !== 'idle';
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    useEffect(scrollToBottom, [messages, isLoading]);
+    useEffect(scrollToBottom, [messages, aiState]);
 
     const handleSend = () => {
         if (input.trim() && !isLoading) {
@@ -51,15 +53,19 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ messages, onSendMessag
                 </div>
             )
         }
+        if (part.functionResponse) {
+             return (
+                 <div key={index} className="my-2 p-2 bg-gray-900/50 border border-gray-700 rounded-md">
+                    <p className="text-xs text-gray-400 font-semibold">Tool Response:</p>
+                    <code className="text-xs text-amber-300 font-mono whitespace-pre-wrap">{JSON.stringify(part.functionResponse.response, null, 2)}</code>
+                </div>
+            )
+        }
         return null;
     };
 
     return (
-        <div className="flex-grow bg-[#272a33] rounded-lg flex flex-col border border-[#3a3d46] min-h-0">
-            <div className="p-2 border-b border-[#3a3d46] flex items-center space-x-2">
-                <SparklesIcon className="w-4 h-4 text-teal-400" />
-                <h2 className="text-gray-300 font-semibold text-xs uppercase tracking-wider">AI Assistant</h2>
-            </div>
+        <div className="h-full flex flex-col bg-[#272a33] min-h-0">
             <div className="flex-grow p-2 space-y-4 overflow-y-auto text-xs">
                 {messages.map((msg, index) => (
                     <div key={index} className={`flex items-start space-x-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
@@ -73,7 +79,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ messages, onSendMessag
                     <div className="flex items-start space-x-2">
                          <div className="w-6 h-6 rounded-full flex items-center justify-center bg-teal-800 flex-shrink-0"><ArrowPathIcon className="w-4 h-4 text-teal-300 animate-spin" /></div>
                          <div className="p-2 rounded-md bg-[#1e2026] text-gray-400 italic">
-                            Thinking...
+                            {aiState.message || 'Thinking...'}
                          </div>
                     </div>
                 )}

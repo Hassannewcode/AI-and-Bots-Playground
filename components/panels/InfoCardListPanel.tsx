@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface Stat {
@@ -16,11 +15,21 @@ interface InfoCardProps {
 const InfoCard: React.FC<InfoCardProps> = ({ title, icon, stats }) => (
     <div className="bg-[#1e2026] rounded-md flex p-2 h-20 w-full text-left transition-colors">
         <div className="w-10 h-10 rounded-full flex-shrink-0 bg-[#272a33]">{icon}</div>
-        <div className="ml-2 flex-grow overflow-hidden">
-            <p className="font-bold text-white text-base leading-tight truncate">{title}</p>
-            <div className="text-gray-400 text-xs space-y-0.5 mt-1">
+        <div className="ml-2 flex-grow overflow-hidden flex flex-col">
+            <p className="font-bold text-white text-base leading-tight truncate flex-shrink-0">{title}</p>
+            <div className="text-gray-400 text-xs space-y-0.5 mt-1 overflow-y-auto">
                 {stats.length > 0 
-                    ? stats.map(stat => <div key={stat.id} className="truncate">{stat.value}</div>)
+                    ? stats.map(stat => (
+                        <div 
+                            key={stat.id} 
+                            className={stat.id === 'thought' 
+                                ? 'text-gray-300 italic whitespace-normal' // Style for thoughts
+                                : 'truncate' // Default style for other stats
+                            }
+                        >
+                            {stat.value}
+                        </div>
+                    ))
                     : <div className="text-gray-500">No data</div>
                 }
             </div>

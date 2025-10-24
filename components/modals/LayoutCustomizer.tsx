@@ -5,15 +5,17 @@ import type { PanelLayout, PanelComponentKey } from '../../game/types';
 
 type ColumnKey = keyof PanelLayout;
 
-const PANEL_DETAILS: Record<PanelComponentKey, { title: string, description: string }> = {
-    'FileTreePanel': { title: 'Explorer', description: 'File tree and navigation.' },
+const PANEL_DETAILS: Record<PanelComponentKey, { title: string, description: string } | null> = {
+    'CombinedSidebarPanel': { title: 'Sidebar', description: 'Explorer & AI Assistant.' },
     'EditorPanel': { title: 'Editor', description: 'Code editor component.' },
     'TabbedOutputPanel': { title: 'Output', description: 'Console, problems, and guide tabs.' },
     'PrimaryDisplayPanel': { title: 'Preview', description: 'Game preview window.' },
     'InfoCardListPanel': { title: 'Sprites', description: 'List of active sprites.' },
     'UserDetailsPanel': { title: 'User Details', description: 'User profile card.' },
     'ActionButtonsPanel': { title: 'Actions', description: 'Run and help buttons.' },
-    'AIChatPanel': { title: 'AI Assistant', description: 'Conversational AI for coding tasks.' }
+    // These are now combined and should not be individually selectable
+    'FileTreePanel': null,
+    'AIChatPanel': null,
 };
 
 interface LayoutCustomizerProps {
@@ -89,6 +91,9 @@ const LayoutCustomizer: React.FC<LayoutCustomizerProps> = ({ initialLayout, onSa
                         >
                             <h3 className="text-center font-bold uppercase text-xs text-gray-500 tracking-wider mb-2">{columnKey} Column</h3>
                             {layout[columnKey].map((panelKey, index) => {
+                                const details = PANEL_DETAILS[panelKey];
+                                if (!details) return null;
+
                                 const isBeingDragged = draggedItem.current?.panel === panelKey;
                                 return (
                                     <React.Fragment key={panelKey}>
@@ -101,8 +106,8 @@ const LayoutCustomizer: React.FC<LayoutCustomizerProps> = ({ initialLayout, onSa
                                             onDragEnter={(e) => handleDragEnter(e, columnKey, index)}
                                             className={`p-3 bg-[#1e2026] rounded border border-gray-700 cursor-grab mb-2 transition-opacity ${isBeingDragged ? 'opacity-30' : 'hover:border-gray-500'}`}
                                         >
-                                            <h4 className="font-bold text-white text-sm">{PANEL_DETAILS[panelKey].title}</h4>
-                                            <p className="text-xs text-gray-400 mt-1">{PANEL_DETAILS[panelKey].description}</p>
+                                            <h4 className="font-bold text-white text-sm">{details.title}</h4>
+                                            <p className="text-xs text-gray-400 mt-1">{details.description}</p>
                                         </div>
                                     </React.Fragment>
                                 );

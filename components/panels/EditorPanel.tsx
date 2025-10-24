@@ -134,6 +134,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
       <div className="flex-grow relative min-h-0">
         {activeTabId && activeFile ? (
             <CodeEditor 
+              key={activeTabId}
               code={code} 
               onCodeChange={onCodeChange} 
               language={activeLanguage}

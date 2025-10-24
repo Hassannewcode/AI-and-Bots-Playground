@@ -1,13 +1,13 @@
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { produce } from 'immer';
 import { nanoid } from 'nanoid';
-import type { Content, FunctionCall, Chat } from '@google/genai';
+import { GoogleGenAI, Type, FunctionDeclaration, Content, FunctionCall, Part } from '@google/genai';
 
 import { parseCode } from './game/engine';
-import { getGeminiResponse, createAssistantChatSession } from './game/gemini';
+import { getGeminiResponse, getAiThought } from './game/gemini';
 import type { GameState, Problem, ExecutionStep, FileSystemTree, FileSystemNode, PanelLayout, PanelComponentKey } from './game/types';
+import type { AIStateStatus } from './ai/types';
+import { runAssistantTurn } from './ai/assistant';
 import { toggleFullscreen, shareCode } from './controls/gameControls';
 
 // Components
@@ -17,13 +17,12 @@ import { TabbedOutputPanel } from './components/panels/TabbedOutputPanel';
 import { EditorPanel } from './components/panels/EditorPanel';
 import { UserDetailsPanel } from './components/panels/UserDetailsPanel';
 import { ActionButtonsPanel } from './components/panels/ActionButtonsPanel';
-import { AIChatPanel } from './components/panels/AIChatPanel';
+import { CombinedSidebarPanel } from './components/panels/CombinedSidebarPanel';
 import HelpModal from './components/modals/HelpModal';
 import SettingsModal from './components/modals/SettingsModal';
 import NewItemModal from './components/modals/NewItemModal';
 import LayoutCustomizer from './components/modals/LayoutCustomizer';
 import ConfirmationModal from './components/modals/ConfirmationModal';
-import { FileTreePanel } from './components/panels/FileTreePanel';
 
 
 // Icons
@@ -134,17 +133,16 @@ const App: React.FC = () => {
   const [isLayoutCustomizationActive, setLayoutCustomizationActive] = useState(false);
   
   // AI Assistant State
-  const assistantChatRef = useRef<Chat | null>(null);
   const [aiChatHistory, setAiChatHistory] = useState<Content[]>([
-    { role: 'model', parts: [{ text: "Hello! I'm Coder, your AI assistant. I can help you create, analyze, and edit files. How can I help?" }]}
+    { role: 'model', parts: [{ text: "Hello! I'm Coder, your AI assistant. I can see your screen, files, and console. How can I help?" }]}
   ]);
-  const [isAiAssistantLoading, setIsAiAssistantLoading] = useState(false);
+  const [aiAssistantState, setAiAssistantState] = useState<AIStateStatus>({ state: 'idle' });
   const [confirmation, setConfirmation] = useState<{ message: string; onConfirm: () => void; onCancel: () => void } | null>(null);
 
   const defaultLayout: PanelLayout = {
-    left: ['FileTreePanel'],
+    left: ['CombinedSidebarPanel'],
     middle: ['EditorPanel', 'TabbedOutputPanel'],
-    right: ['PrimaryDisplayPanel', 'AIChatPanel', 'ActionButtonsPanel']
+    right: ['PrimaryDisplayPanel', 'InfoCardListPanel', 'UserDetailsPanel', 'ActionButtonsPanel']
   };
 
   const [settings, setSettings] = useState({
@@ -164,6 +162,7 @@ const App: React.FC = () => {
   const activeLanguage = activeFile?.name.split('.').pop() || 'txt';
 
   const processStep = useCallback(async (step: ExecutionStep) => {
+      // Synchronous state updates
       await setGameState(produce(draft => {
         const sprite = 'spriteId' in step && step.spriteId ? draft.sprites.find(s => s.id === step.spriteId) : undefined;
         switch (step.type) {
@@ -212,9 +211,11 @@ const App: React.FC = () => {
             break;
         }
       }));
+
        if (step.type === 'LOG') setLogs(prev => [...prev, step.message]);
        if (step.type === 'CLEAR_LOG') setLogs([]);
 
+        // Asynchronous operations that update state again
         if (step.type === 'AI_CHAT_REQUEST') {
             const senderSprite = gameState.sprites.find(s => s.id === step.spriteId);
             const otherSprites = gameState.sprites.filter(s => s.id !== step.spriteId);
@@ -250,6 +251,25 @@ const App: React.FC = () => {
                     setLogs(prev => [...prev.slice(0, -1), `Error: Gemini API call failed for ${receiverSprite.name}: ${errorMessage}`]);
                     setProblems(prev => [...prev, { fileId: activeTabId, line: 0, message: `Gemini API Error: ${errorMessage}`, code: code, language: activeLanguage }]);
                     if (activeOutputTabId !== 'guide') setActiveOutputTabId('problems');
+                }
+            }
+        }
+
+        if (step.type === 'SPRITE_REWARD') {
+            const sprite = gameState.sprites.find(s => s.id === step.spriteId);
+            if (sprite?.brain) { // Check if brain exists
+                try {
+                    const thought = await getAiThought(sprite.name, step.value);
+                    setGameState(produce(draft => {
+                        const targetSprite = draft.sprites.find(s => s.id === step.spriteId);
+                        if (targetSprite?.brain) {
+                            targetSprite.brain.lastThought = thought;
+                        }
+                    }));
+                } catch (e) {
+                    // Log error but don't stop the simulation
+                    console.error("Failed to generate AI thought:", e);
+                    setLogs(prev => [...prev, `[System] Error generating thought for ${sprite.name}`]);
                 }
             }
         }
@@ -305,74 +325,71 @@ const App: React.FC = () => {
     };
   }, [isRunning, runNextStep]);
   
-  const resetSimulation = async () => {
-    setIsRunning(false);
-    if (runnerTimeoutRef.current) clearTimeout(runnerTimeoutRef.current);
-    
-     // We need to re-parse to get the initial state from world.html etc.
-    const { steps, problems: compileProblems } = await parseCode(code, fileSystem, activeLanguage, activeTabId, settings.pythonEngine);
-    if (compileProblems.length > 0) {
-        setGameState(initialGameState);
-    } else {
-        const previewState = produce(initialGameState, draft => {
-            for (const step of steps) {
-                if (step.type === 'CREATE_SPRITE') draft.sprites.push(step.sprite);
-                if (step.type === 'CREATE_PROP') draft.props.push(step.prop);
-                if (step.type === 'SET_BACKGROUND') draft.worldState.backgroundColor = step.color;
-            }
-        });
-        setGameState(previewState);
-    }
-
-    setLogs(['Simulation reset.']);
-    setCurrentStep(0);
-  };
-  
-  const startSimulation = () => {
-    resetSimulation().then(() => {
-        setLogs(['Running simulation...']);
-        setCurrentStep(0);
-        setActiveOutputTabId('console');
-        setIsRunning(true);
-    });
-  };
-
-  const handleRun = async (runCode: string, lang: string, fileId: string) => {
-    setIsExecuting(true);
-    setLogs([`Executing ${lang} code...`]);
-    try {
-        const { steps, problems: compileProblems, logs: compileLogs } = await parseCode(runCode, fileSystem, lang, fileId, settings.pythonEngine);
+    // A new function to set up the initial state of a simulation without running it.
+    const prepareForReplay = useCallback(() => {
+        setIsRunning(false);
+        if (runnerTimeoutRef.current) clearTimeout(runnerTimeoutRef.current);
         
-        const problemsWithCodeContext = compileProblems.map(p => ({ ...p, code: runCode, language: lang }));
-        setProblems(problemsWithCodeContext);
-        setLogs(prev => [...prev, ...compileLogs]);
+        setCurrentStep(0);
 
-        if (compileProblems.length > 0) {
-            if (activeOutputTabId !== 'guide') setActiveOutputTabId('problems');
-            setLogs(prev => [...prev, 'Cannot run due to errors.']);
+        if (executionStepsRef.current.length === 0) {
+            setGameState(initialGameState); // Reset to a blank state
+            setLogs(prev => [...prev, 'No replay available. Run code to create one.']);
             return;
         }
-        executionStepsRef.current = steps;
-        
-        // This is a new step: set the initial state from all CREATE_* steps before running
+
+        // Set the initial state from all CREATE_* steps
         const previewState = produce(initialGameState, draft => {
-            for (const step of steps) {
+            for (const step of executionStepsRef.current) {
+                // Apply only the initial setup steps
                 if (step.type === 'CREATE_SPRITE') draft.sprites.push(step.sprite);
                 if (step.type === 'CREATE_PROP') draft.props.push(step.prop);
                 if (step.type === 'SET_BACKGROUND') draft.worldState.backgroundColor = step.color;
             }
         });
         setGameState(previewState);
+        setLogs(['Replay is ready. Press play to start.']);
+    }, []);
 
-        startSimulation();
-    } catch(e) {
-        const errorMessage = e instanceof Error ? e.message : "An unknown execution error occurred.";
-        setProblems(prev => [...prev, { fileId, line: 0, message: `Fatal Execution Error: ${errorMessage}`, code: runCode, language: lang }]);
-        if (activeOutputTabId !== 'guide') setActiveOutputTabId('problems');
-    } finally {
-        setIsExecuting(false);
-    }
-  };
+    const handleRun = async (runCode: string, lang: string, fileId: string) => {
+        setIsExecuting(true);
+        // Stop any current replay
+        setIsRunning(false);
+        if (runnerTimeoutRef.current) clearTimeout(runnerTimeoutRef.current);
+        
+        setLogs([`Compiling and running ${lang} code...`]);
+        setProblems([]); // Clear old problems
+        setActiveOutputTabId('console');
+
+        try {
+            const { steps, problems: compileProblems, logs: compileLogs } = await parseCode(runCode, fileSystem, lang, fileId, settings.pythonEngine);
+            
+            const problemsWithCodeContext = compileProblems.map(p => ({ ...p, code: runCode, language: lang }));
+            setProblems(problemsWithCodeContext);
+            setLogs(prev => [...prev, ...compileLogs]);
+
+            if (compileProblems.length > 0) {
+                if (activeOutputTabId !== 'guide') setActiveOutputTabId('problems');
+                setLogs(prev => [...prev, 'Compilation failed. Cannot create replay.']);
+                executionStepsRef.current = []; // Clear steps on failure
+            } else {
+                setLogs(prev => [...prev, 'Compilation successful. Replay is ready.']);
+                executionStepsRef.current = steps;
+            }
+            
+            // This will set up the preview or clear the board if compilation failed
+            prepareForReplay();
+
+        } catch(e) {
+            const errorMessage = e instanceof Error ? e.message : "An unknown execution error occurred.";
+            setProblems(prev => [...prev, { fileId, line: 0, message: `Fatal Execution Error: ${errorMessage}`, code: runCode, language: lang }]);
+            if (activeOutputTabId !== 'guide') setActiveOutputTabId('problems');
+            executionStepsRef.current = [];
+            prepareForReplay();
+        } finally {
+            setIsExecuting(false);
+        }
+    };
   
   const handleRunCurrentFile = () => {
     if (activeFile?.type !== 'file' || isExecuting || activeFile?.status === 'deleted') return;
@@ -383,21 +400,50 @@ const App: React.FC = () => {
       if (isExecuting) return;
       const runnableTabs = openTabs
         .map(id => fileSystem[id])
-        .filter(node => node?.type === 'file' && (node.name.endsWith('.js') || node.name.endsWith('.py')) && node.status !== 'deleted');
+        .filter((node): node is Extract<FileSystemNode, {type: 'file'}> => !!node && node.type === 'file' && (node.name.endsWith('.js') || node.name.endsWith('.py')) && node.status !== 'deleted');
 
       if (runnableTabs.length === 0) {
           setLogs(prev => [...prev, 'No runnable files (.js, .py) are open.']);
           return;
       }
       
-      const combinedCode = runnableTabs.map(node => (node as any).code).join('\n\n');
+      const combinedCode = runnableTabs.map(node => node.code).join('\n\n');
       // Use the language and fileId of the active tab as the primary context
       handleRun(combinedCode, activeLanguage, activeTabId);
   };
 
+    const handleToggleReplay = () => {
+        if (isExecuting || executionStepsRef.current.length === 0) {
+            if (!isExecuting) {
+                setLogs(prev => [...prev, 'No simulation has been run yet. Click "Run This File" first.']);
+            }
+            return;
+        }
 
-  const handlePause = () => setIsRunning(false);
-  const handleStop = () => resetSimulation();
+        if (isRunning) {
+            // Pause
+            setIsRunning(false);
+        } else {
+            // Play/Resume
+            // If the replay was finished, reset it before playing again.
+            if (currentStep >= executionStepsRef.current.length) {
+                // Re-call prepareForReplay to reset the visual state to frame 0
+                prepareForReplay();
+                // Use a timeout to ensure React has processed the state update from prepareForReplay
+                // before we set isRunning to true and trigger the animation loop.
+                setTimeout(() => setIsRunning(true), 50);
+            } else {
+                // Otherwise, just resume from the current step
+                setIsRunning(true);
+            }
+        }
+    };
+
+    const handleStopReplay = () => {
+        if (isExecuting) return;
+        // Stop and rewind to frame 0.
+        prepareForReplay();
+    };
 
   const handleStepForward = async () => {
     if (isRunning || currentStep >= executionStepsRef.current.length) return;
@@ -479,55 +525,64 @@ const App: React.FC = () => {
         }
     }));
 
-    const newTabs = openTabs.filter(t => t !== itemId);
-    setOpenTabs(newTabs);
-    if (activeTabId === itemId) {
-        if (newTabs.length > 0) {
-            const tabIndex = openTabs.indexOf(itemId);
-            setActiveTabId(newTabs[Math.max(0, tabIndex - 1)]);
-        } else {
-            setActiveTabId('');
+    // Use functional updates to avoid stale state
+    setOpenTabs(currentOpenTabs => {
+      const newTabs = currentOpenTabs.filter(t => t !== itemId);
+
+      setActiveTabId(currentActiveTabId => {
+        if (currentActiveTabId === itemId) {
+          if (newTabs.length > 0) {
+            const tabIndex = currentOpenTabs.indexOf(itemId);
+            return newTabs[Math.max(0, tabIndex - 1)];
+          }
+          return '';
         }
-    }
-  }, [openTabs, activeTabId]);
+        return currentActiveTabId;
+      });
+
+      return newTabs;
+    });
+  }, []);
 
   const handlePermanentDelete = useCallback((itemId: string) => {
-    let allIdsToDelete: string[] = [];
+      const allIdsToDelete = new Set<string>();
+      const queue = [itemId];
+      while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        if (allIdsToDelete.has(currentId)) continue;
+        allIdsToDelete.add(currentId);
+        const node = fileSystem[currentId];
+        if (node?.type === 'folder') {
+          node.children.forEach(childId => queue.push(childId));
+        }
+      }
 
-    setFileSystem(produce(draft => {
-        const queue = [itemId];
-        const visited = new Set<string>();
-
-        while (queue.length > 0) {
-            const currentId = queue.shift()!;
-            if (visited.has(currentId)) continue;
-            visited.add(currentId);
-            allIdsToDelete.push(currentId);
-
-            const currentNode = draft[currentId];
-            if (currentNode.type === 'folder') {
-                queue.push(...currentNode.children);
-            }
-
-            if (currentNode.parentId) {
-                const parent = draft[currentNode.parentId] as Extract<FileSystemNode, { type: 'folder' }>;
-                if (parent) {
-                    parent.children = parent.children.filter(id => id !== currentId);
-                }
+      setFileSystem(produce(draft => {
+        const item = draft[itemId];
+        if (item?.parentId) {
+            const parent = draft[item.parentId] as Extract<FileSystemNode, { type: 'folder' }>;
+            if (parent?.children) {
+                parent.children = parent.children.filter(id => id !== itemId);
             }
         }
-        
-        for (const id of allIdsToDelete) {
-            delete draft[id];
-        }
-    }));
+        allIdsToDelete.forEach(id => {
+          delete draft[id];
+        });
+      }));
+      
+      const idsToDeleteArray = Array.from(allIdsToDelete);
 
-    setOpenTabs(tabs => tabs.filter(t => !allIdsToDelete.includes(t)));
-    if (allIdsToDelete.includes(activeTabId)) {
-        const newTabs = openTabs.filter(t => !allIdsToDelete.includes(t));
-        setActiveTabId(newTabs[0] || '');
-    }
-  }, [activeTabId, openTabs]);
+      setOpenTabs(currentOpenTabs => {
+        const newTabs = currentOpenTabs.filter(t => !idsToDeleteArray.includes(t));
+        setActiveTabId(currentActiveTabId => {
+          if (idsToDeleteArray.includes(currentActiveTabId)) {
+            return newTabs[0] || '';
+          }
+          return currentActiveTabId;
+        });
+        return newTabs;
+      });
+  }, [fileSystem]);
 
   const handleRestore = useCallback((itemId: string) => {
     setFileSystem(produce(draft => {
@@ -563,135 +618,53 @@ const App: React.FC = () => {
 
     return () => clearInterval(purgeInterval);
   }, [fileSystem, handlePermanentDelete]);
-
-    const findFileIdByName = (name: string): string | null => {
-        // FIX: Explicitly type `node` as FileSystemNode to resolve TypeScript inference issue.
-        const found = Object.values(fileSystem).find((node: FileSystemNode) => node.name === name && node.type === 'file' && node.status !== 'deleted');
-        return found ? found.id : null;
-    };
     
-  // AI Assistant Tool Handlers
-  const assistantTools = {
-      listAllFiles: () => {
-          // FIX: Explicitly type `f` as FileSystemNode to resolve TypeScript inference issue.
-          const files = Object.values(fileSystem).filter((f: FileSystemNode) => f.status !== 'deleted').map(f => f.name).join('\n');
-          return { result: `Here are all the files in the workspace:\n${files}` };
-      },
-      readFile: ({ fileName }: { fileName: string }) => {
-          const fileId = findFileIdByName(fileName);
-          const file = fileId ? fileSystem[fileId] as Extract<FileSystemNode, { type: 'file' }> : null;
-          return file ? { result: file.code } : { result: `Error: File '${fileName}' not found.` };
-      },
-      getActiveFileContent: () => {
-          return activeFile?.type === 'file' ? { result: activeFile.code } : { result: 'No file is currently active in the editor.' };
-      },
-      createFile: ({ fileName }: { fileName: string }) => {
-          if (findFileIdByName(fileName)) return { result: `Error: File '${fileName}' already exists.` };
-          handleCreateItem(fileName, 'root', 'file');
-          return { result: `File '${fileName}' created successfully.` };
-      },
-      renameFile: ({ oldFileName, newFileName }: { oldFileName: string, newFileName: string }) => {
-          const fileId = findFileIdByName(oldFileName);
-          if (!fileId) return { result: `Error: File '${oldFileName}' not found.` };
-          if (findFileIdByName(newFileName)) return { result: `Error: A file named '${newFileName}' already exists.` };
-          setFileSystem(produce(draft => { draft[fileId].name = newFileName; }));
-          return { result: `Renamed '${oldFileName}' to '${newFileName}'.` };
-      },
-      replaceCodeInRange: ({ fileName, startLine, endLine, newCode }: { fileName: string, startLine: number, endLine: number, newCode: string }) => {
-          const fileId = findFileIdByName(fileName);
-          if (!fileId) return { result: `Error: File '${fileName}' not found.` };
-          handleApplyCodeFix(fileId, startLine, endLine, newCode);
-          return { result: `Code updated in '${fileName}'.` };
-      },
-      deleteFile: ({ fileName }: { fileName: string }) => {
-          const fileId = findFileIdByName(fileName);
-          if (!fileId) return { result: `Error: File '${fileName}' not found.` };
-
-          return new Promise(resolve => {
-            const onConfirm = () => {
-                handleSoftDelete(fileId);
-                setConfirmation(null);
-                resolve({ result: `User confirmed. File '${fileName}' deleted.` });
-            };
-            const onCancel = () => {
-                setConfirmation(null);
-                resolve({ result: 'User cancelled file deletion.' });
-            };
-            setConfirmation({
-                message: `The AI assistant wants to delete "${fileName}". Are you sure?`,
-                onConfirm,
-                onCancel
-            });
-          });
-      },
-  };
-
     const handleSendAiChatMessage = async (message: string) => {
-        if (!assistantChatRef.current) {
-            assistantChatRef.current = createAssistantChatSession();
-        }
-        
-        setIsAiAssistantLoading(true);
+        const userContent: Content = { role: 'user', parts: [{ text: message }] };
+        setAiChatHistory(prev => [...prev, userContent]);
 
-        const newHistory: Content[] = [...aiChatHistory, { role: 'user', parts: [{ text: message }] }];
-        setAiChatHistory(newHistory);
-        
-        try {
-            const chat = assistantChatRef.current;
-            let result = await chat.sendMessage({ message });
-
-            while (true) {
-                const functionCalls = result.functionCalls;
-                if (!functionCalls || functionCalls.length === 0) {
-                    setAiChatHistory(prev => [...prev, { role: 'model', parts: [{ text: result.text }] }]);
-                    break; 
-                }
-                
-                setAiChatHistory(prev => [...prev, { role: 'model', parts: [{ functionCall: functionCalls[0] }] }]);
-
-                const call = functionCalls[0] as FunctionCall;
-                const toolName = call.name as keyof typeof assistantTools;
-
-                if (toolName in assistantTools) {
-                    const toolResult = await assistantTools[toolName](call.args as any);
-                     result = await chat.sendToolResponse({
-                        functionResponses: {
-                           id: call.id,
-                           name: call.name,
-                           response: toolResult,
-                        }
-                    });
-                } else {
-                     result = await chat.sendToolResponse({
-                         functionResponses: {
-                            id: call.id,
-                            name: call.name,
-                            response: { result: `Error: Unknown tool '${toolName}'.` },
-                         }
+        await runAssistantTurn({
+            message,
+            history: [...aiChatHistory, userContent],
+            appState: {
+                fileSystem,
+                openTabs,
+                activeTabId,
+                logs,
+                problems,
+            },
+            callbacks: {
+                onStateChange: setAiAssistantState,
+                onHistoryChange: setAiChatHistory,
+                onFileSystemChange: (updater) => setFileSystem(produce(updater)),
+                setOpenTabs,
+                setActiveTabId,
+                onConfirm: (confirmationMessage: string) => {
+                    return new Promise(resolve => {
+                        setConfirmation({
+                            message: confirmationMessage,
+                            onConfirm: () => { setConfirmation(null); resolve(true); },
+                            onCancel: () => { setConfirmation(null); resolve(false); }
+                        });
                     });
                 }
             }
-        } catch (error) {
-            console.error("AI Assistant Error:", error);
-            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-            setAiChatHistory(prev => [...prev, { role: 'model', parts: [{ text: `Sorry, I encountered an error: ${errorMessage}` }] }]);
-        } finally {
-            setIsAiAssistantLoading(false);
-        }
+        });
     };
 
 
   const primaryDisplayControls = [
-    { id: 'play', icon: isRunning ? <PauseIcon /> : (isExecuting ? <ArrowPathIcon className="animate-spin" /> : <PlayIcon />), onClick: isRunning ? handlePause : handleRunCurrentFile, isPrimary: true, disabled: isExecuting || (activeLanguage !== 'py' && activeLanguage !== 'js') },
+    { id: 'play', icon: isRunning ? <PauseIcon /> : (isExecuting ? <ArrowPathIcon className="animate-spin" /> : <PlayIcon />), onClick: handleToggleReplay, isPrimary: true, disabled: isExecuting || executionStepsRef.current.length === 0 },
     { id: 'step', icon: <ChevronRightIcon />, onClick: handleStepForward, disabled: isExecuting || isRunning || currentStep >= executionStepsRef.current.length },
-    { id: 'stop', icon: <StopIcon />, onClick: handleStop, disabled: isExecuting || executionStepsRef.current.length === 0 },
+    { id: 'stop', icon: <StopIcon />, onClick: handleStopReplay, disabled: isExecuting || executionStepsRef.current.length === 0 },
   ];
 
   const infoCardsData = gameState.sprites.map(sprite => ({
     id: sprite.id, title: sprite.name, icon: getIconForShape(sprite.shape),
     stats: [
         ...Object.entries(sprite.data).map(([key, value]) => ({ id: key, value: `${key}: ${value}` })),
-        ...(sprite.brain ? [{ id: 'rewards', value: `Rewards: ${sprite.brain.rewards}`}] : [])
+        ...(sprite.brain ? [{ id: 'rewards', value: `Rewards: ${sprite.brain.rewards}`}] : []),
+        ...(sprite.brain?.lastThought ? [{ id: 'thought', value: `"${sprite.brain.lastThought}"` }] : [])
     ],
   }));
 
@@ -709,10 +682,9 @@ const App: React.FC = () => {
   ];
   
   const renderLayout = () => {
-    // FIX: Removed `key` prop from component definitions and changed type to React.ReactElement to fix TypeScript error.
-    // The key is now applied during rendering in `renderColumn`.
-    const panelComponentMap: Record<PanelComponentKey, React.ReactElement> = {
-      FileTreePanel: <FileTreePanel 
+    const panelComponentMap: Record<PanelComponentKey, React.ReactElement | null> = {
+      CombinedSidebarPanel: <CombinedSidebarPanel
+        // FileTreePanel Props
         fileSystem={fileSystem}
         setFileSystem={setFileSystem}
         openTabs={openTabs}
@@ -723,6 +695,10 @@ const App: React.FC = () => {
         onSoftDelete={handleSoftDelete}
         onPermanentDelete={handlePermanentDelete}
         onRestore={handleRestore}
+        // AIChatPanel Props
+        messages={aiChatHistory}
+        onSendMessage={handleSendAiChatMessage}
+        aiState={aiAssistantState}
       />,
       EditorPanel: <EditorPanel 
         actions={editorActions}
@@ -764,23 +740,21 @@ const App: React.FC = () => {
         onHelpClick={() => setHelpOpen(true)}
         isExecuting={isExecuting}
       />,
-      AIChatPanel: <AIChatPanel
-        messages={aiChatHistory}
-        onSendMessage={handleSendAiChatMessage}
-        isLoading={isAiAssistantLoading}
-       />,
+      // These are now part of CombinedSidebarPanel and should not be rendered directly
+      FileTreePanel: null,
+      AIChatPanel: null,
     };
 
     const codeFocusedLayout: PanelLayout = {
       left: ['PrimaryDisplayPanel', 'InfoCardListPanel', 'UserDetailsPanel', 'ActionButtonsPanel'],
       middle: ['EditorPanel', 'TabbedOutputPanel'],
-      right: ['FileTreePanel', 'AIChatPanel']
+      right: ['CombinedSidebarPanel']
     };
 
     const previewFocusedLayout: PanelLayout = {
       left: ['EditorPanel', 'TabbedOutputPanel'],
       middle: ['PrimaryDisplayPanel', 'InfoCardListPanel', 'UserDetailsPanel', 'ActionButtonsPanel'],
-      right: ['FileTreePanel', 'AIChatPanel']
+      right: ['CombinedSidebarPanel']
     };
 
     let currentLayout: PanelLayout;
@@ -805,18 +779,27 @@ const App: React.FC = () => {
       let i = 0;
       while (i < panels.length) {
         const panelKey = panels[i];
+        const panelComponent = panelComponentMap[panelKey];
+        if (!panelComponent) {
+            i++;
+            continue;
+        }
+
         const isSidePanel = ['InfoCardListPanel', 'UserDetailsPanel', 'ActionButtonsPanel'].includes(panelKey);
 
         if (isSidePanel) {
           const group: React.ReactNode[] = [];
           while (i < panels.length && ['InfoCardListPanel', 'UserDetailsPanel', 'ActionButtonsPanel'].includes(panels[i])) {
             const currentPanelKey = panels[i];
-            group.push(React.cloneElement(panelComponentMap[currentPanelKey], { key: currentPanelKey }));
+            const currentPanelComponent = panelComponentMap[currentPanelKey];
+            if (currentPanelComponent) {
+                 group.push(React.cloneElement(currentPanelComponent, { key: currentPanelKey }));
+            }
             i++;
           }
           renderedPanels.push(<div key={`side-panel-group-${i}`} className="flex-shrink-0 flex space-x-2 h-[220px]">{group}</div>);
         } else {
-          renderedPanels.push(React.cloneElement(panelComponentMap[panelKey], { key: panelKey }));
+          renderedPanels.push(React.cloneElement(panelComponent, { key: panelKey }));
           i++;
         }
       }

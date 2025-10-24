@@ -1,3 +1,5 @@
+
+
 import type { CSSProperties } from 'react';
 
 export interface Prop {
@@ -29,12 +31,13 @@ export interface Sprite {
   chatHistory?: { role: 'user' | 'model'; parts: { text: string }[] }[];
   brain?: {
       rewards: number;
+      lastThought?: string;
   };
 }
 
 export type GameEffect = 
     | { id: string; type: 'soundwave'; x: number; y: number; creationTime: number; maxRadius: number; duration: number; }
-    | { id: string; type: 'rewardflash'; spriteId: string; creationTime: number; duration: number; };
+    | { id:string; type: 'rewardflash'; spriteId: string; creationTime: number; duration: number; };
 
 export interface Zone {
     id: string;
@@ -131,7 +134,8 @@ export type PanelComponentKey =
   | 'InfoCardListPanel' 
   | 'UserDetailsPanel' 
   | 'ActionButtonsPanel'
-  | 'AIChatPanel';
+  | 'AIChatPanel'
+  | 'CombinedSidebarPanel';
 
 export interface PanelLayout {
   left: PanelComponentKey[];
