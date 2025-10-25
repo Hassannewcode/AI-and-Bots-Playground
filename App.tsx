@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { produce } from 'immer';
 import { nanoid } from 'nanoid';
@@ -657,7 +658,6 @@ const App: React.FC = () => {
 
 
   const primaryDisplayControls = [
-// FIX: Added w-6 h-6 to ArrowPathIcon to ensure it has a size and matches the other icons in this control group.
     { id: 'play', icon: isRunning ? <PauseIcon /> : (isExecuting ? <ArrowPathIcon className="w-6 h-6 animate-spin" /> : <PlayIcon />), onClick: handleToggleReplay, isPrimary: true, disabled: isExecuting || executionStepsRef.current.length === 0 },
     { id: 'step', icon: <ChevronRightIcon />, onClick: handleStepForward, disabled: isExecuting || isRunning || currentStep >= executionStepsRef.current.length },
     { id: 'stop', icon: <StopIcon />, onClick: handleStopReplay, disabled: isExecuting || executionStepsRef.current.length === 0 },
@@ -681,7 +681,6 @@ const App: React.FC = () => {
   const editorActions = [ {id: 'settings', icon: <Cog6ToothIcon />, onClick: () => setSettingsOpen(true)} ];
   const currentUser = { name: 'Current User', avatar: <UserCircleIcon className="w-full h-full text-gray-500" />, status: 'ONLINE', rank: 'N/A', rankIcon: <StarIcon /> };
   
-// FIX: Defined a specific type for the action buttons to prevent TypeScript from widening the 'style' property to a generic 'string'.
   type ActionButton = {
     id: string;
     text: string;
@@ -695,6 +694,10 @@ const App: React.FC = () => {
     { id: 'secondary', text: 'Run All Open Files', icon: <PlayIcon />, onClick: handleRunAllOpenFiles, style: 'secondary' },
   ];
   
+  const handleAddProblem = useCallback((problem: Problem) => {
+      setProblems(prev => [...prev, problem]);
+  }, []);
+
   const renderLayout = () => {
     const panelComponentMap: Record<PanelComponentKey, React.ReactElement | null> = {
       CombinedSidebarPanel: <CombinedSidebarPanel
@@ -726,6 +729,7 @@ const App: React.FC = () => {
         onTabClose={handleSoftDelete}
         onCodeChange={updateCode}
         onNewFileClick={() => handleNewItem('file', 'root')}
+        onAddProblem={handleAddProblem}
       />,
       TabbedOutputPanel: <div className="flex-shrink-0 h-[250px]"><TabbedOutputPanel 
         tabs={ideToolTabs} 

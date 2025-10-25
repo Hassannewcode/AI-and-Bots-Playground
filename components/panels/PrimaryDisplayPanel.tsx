@@ -1,5 +1,6 @@
 
 
+
 import React from 'react';
 import type { GameState, Sprite } from '../../game/types';
 import { getIconForShape, SpeakerWaveIcon, SpeakerXMarkIcon, ShareIcon, ArrowsPointingOutIcon } from '../icons';
@@ -44,7 +45,6 @@ const SpriteComponent: React.FC<{ sprite: Sprite, isRewardFlashing: boolean }> =
 export const PrimaryDisplayPanel: React.FC<PrimaryDisplayPanelProps> = ({ 
     controls, currentFrame, totalFrames, gameState, onMuteToggle, isMuted, onShare, onFullscreen 
 }) => {
-    // FIX: Used flatMap for robust, type-safe filtering and mapping of effects.
     const rewardEffectSpriteIds = new Set(
         gameState.effects.flatMap(e => (e.type === 'rewardflash' ? [e.spriteId] : []))
     );

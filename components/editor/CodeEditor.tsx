@@ -153,6 +153,8 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, p
                     minimap: { enabled: true },
                     folding: true,
                     'bracketPairColorization.enabled': true,
+                    // Improves cursor accuracy with certain fonts/displays at a small performance cost.
+                    'disableMonospaceOptimizations': true, 
                 });
 
                 editorInstance.onDidChangeModelContent(() => {
@@ -195,10 +197,10 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, p
                 console.error("Failed to initialize Monaco Editor:", error);
                 if (containerRef.current) {
                     containerRef.current.innerHTML = `
-                        <div style="color: #ff8a8a; background-color: #1e2026; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 1rem; font-family: sans-serif;">
-                            <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Editor Failed to Load</h3>
-                            <p style="text-align: center; font-size: 0.875rem; color: #d1d5db;">There was an issue initializing the code editor. This can sometimes happen due to network issues or browser extension conflicts.</p>
-                             <p style="text-align: center; font-size: 0.875rem; color: #d1d5db; margin-top: 0.5rem;">Please try reloading the page.</p>
+                        <div style="color: #ff8a8a; background-color: #1e2026; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 1rem; font-family: sans-serif; border: 1px solid #3a3d46; border-radius: 8px;">
+                            <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem; color: #f87171;">Editor Failed to Load</h3>
+                            <p style="text-align: center; font-size: 0.875rem; color: #d1d5db;">There was an issue initializing the code editor. This can happen due to network issues or browser extension conflicts.</p>
+                            <p style="text-align: center; font-size: 0.875rem; color: #d1d5db; margin-top: 0.5rem;">Please try reloading the page. If the issue persists, check the developer console for details.</p>
                         </div>
                     `;
                 }

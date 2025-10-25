@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { produce } from 'immer';
 import type { PanelComponentKey, PanelLayout } from '../../game/types';
@@ -144,7 +145,6 @@ const KeybindingInput: React.FC<{ label: string, value: string, onChange: (value
 
     const handleSet = () => {
         const finalValue = formatKeys(keys);
-        // FIX: Explicitly type `k` as `string` to resolve TypeScript inference issue.
         const hasNonModifier = Array.from(keys).some((k: string) => !k.includes('Control') && !k.includes('Shift') && !k.includes('Alt') && !k.includes('Meta'));
 
         if (keys.size > 0 && hasNonModifier) {

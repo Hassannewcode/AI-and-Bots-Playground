@@ -8,7 +8,6 @@ interface ToolHandlerCallbacks {
     getFileSystem: () => FileSystemTree;
     setFileSystem: (updater: (draft: FileSystemTree) => void) => void;
     onConfirm: (message: string) => Promise<boolean>;
-    // FIX: Updated `setActiveTabId` to accept a value or an updater function, matching React's setState behavior.
     setActiveTabId: (updater: string | ((currentId: string) => string)) => void;
     setOpenTabs: (updater: (tabs: string[]) => string[]) => void;
 }

@@ -1,8 +1,8 @@
 
+
 import React from 'react';
 
 // Reusable components for styling the guide
-// FIX: Changed component definitions to use React.FC to resolve potential TypeScript errors and for consistency.
 const H1: React.FC<{children: React.ReactNode}> = ({ children }) => <h1 className="text-xl font-bold text-white mb-4 font-sans">{children}</h1>;
 const H2: React.FC<{children: React.ReactNode}> = ({ children }) => <h2 className="text-lg font-bold text-teal-400 mt-6 mb-3 font-sans">{children}</h2>;
 const H3: React.FC<{children: React.ReactNode}> = ({ children }) => <h3 className="text-md font-semibold text-white mt-4 mb-2 font-sans">{children}</h3>;
@@ -28,7 +28,6 @@ export const TechnologyGuide: React.FC = () => (
         </P>
         <ul>
             <LI>
-                {/* FIX: Escaped ampersand for valid JSX. */}
                 <H3>C &amp; C++</H3>
                 <P>The <Code>Emscripten</Code> toolchain compiles C/C++ code into a <Code>.wasm</Code> module and a JavaScript "glue" file. This glue code is essential for loading the module and translating system calls (like file I/O) into browser-compatible operations, often using a virtual in-memory file system.</P>
             </LI>
@@ -59,7 +58,6 @@ export const TechnologyGuide: React.FC = () => (
         </P>
         <ul>
             <LI>
-                {/* FIX: Escaped ampersand for valid JSX. */}
                 <H3>Java &amp; Kotlin</H3>
                 <P>Tools like <Code>TeaVM</Code> (for Java) or the native <Code>Kotlin/Wasm</Code> compiler translate JVM bytecode into Wasm. This process includes compiling the necessary parts of the runtime, such as the garbage collector, into the Wasm module.</P>
             </LI>

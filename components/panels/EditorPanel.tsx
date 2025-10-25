@@ -18,10 +18,11 @@ interface EditorPanelProps {
     onCodeChange: (code: string) => void;
     onNewFileClick: () => void;
     onTabsReorder: (tabs: string[]) => void;
+    onAddProblem: (problem: Problem) => void;
 }
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({ 
-    actions, openTabs, activeTabId, fileSystem, problems, settings, onTabClick, onTabClose, onCodeChange, onNewFileClick, onTabsReorder
+    actions, openTabs, activeTabId, fileSystem, problems, settings, onTabClick, onTabClose, onCodeChange, onNewFileClick, onTabsReorder, onAddProblem
 }) => {
   const activeFile = fileSystem[activeTabId];
   const code = (activeFile?.type === 'file' ? activeFile.code : '') || '';
@@ -41,12 +42,19 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         const formatted = await formatCode(code, activeLanguage);
         onCodeChange(formatted);
     } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : "An unknown error occurred during formatting.";
         console.error("Failed to format code:", e);
-        // Optionally, you could set an error state to show a notification
+        onAddProblem({
+            fileId: activeTabId,
+            line: 0, // Indicates a general file error, not on a specific line
+            message: `Code formatting failed: ${errorMessage}`,
+            code: code,
+            language: activeLanguage,
+        });
     } finally {
         setIsFormatting(false);
     }
-  }, [code, activeLanguage, activeFile, onCodeChange, isFormatting]);
+  }, [code, activeLanguage, activeFile, isFormatting, onCodeChange, onAddProblem, activeTabId]);
 
   const commands: EditorCommand[] = [
     {
@@ -72,6 +80,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   
   const handleDragOverTab = (e: React.DragEvent<HTMLDivElement>, targetTabId: string) => {
       e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
       if (!draggedTabId || draggedTabId === targetTabId) return;
 
       const targetIndex = openTabs.indexOf(targetTabId);
@@ -86,20 +95,31 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
 
   const handleDropOnTabBar = (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
-      const draggedId = e.dataTransfer.getData('application/tab-id');
-      if (!draggedId || dropIndicatorIndex === null) return;
-      
-      const draggedIndex = openTabs.indexOf(draggedId);
-      if (draggedIndex === -1) return;
+      try {
+        const draggedId = e.dataTransfer.getData('application/tab-id');
+        if (!draggedId || dropIndicatorIndex === null) return;
+        
+        const draggedIndex = openTabs.indexOf(draggedId);
+        if (draggedIndex === -1) {
+            console.warn("Dropped tab ID not found in open tabs:", draggedId);
+            return;
+        };
 
-      const newTabs = [...openTabs];
-      const [removedTab] = newTabs.splice(draggedIndex, 1);
-      
-      // Adjust the drop index if we're moving an item from left to right
-      const adjustedDropIndex = dropIndicatorIndex > draggedIndex ? dropIndicatorIndex - 1 : dropIndicatorIndex;
-      
-      newTabs.splice(adjustedDropIndex, 0, removedTab);
-      onTabsReorder(newTabs);
+        const newTabs = [...openTabs];
+        const [removedTab] = newTabs.splice(draggedIndex, 1);
+        
+        // Adjust the drop index if we're moving an item from left to right
+        const adjustedDropIndex = dropIndicatorIndex > draggedIndex ? dropIndicatorIndex - 1 : dropIndicatorIndex;
+        
+        newTabs.splice(adjustedDropIndex, 0, removedTab);
+        onTabsReorder(newTabs);
+      } catch (error) {
+          console.error("Error during tab drop operation:", error);
+      } finally {
+          // Always clean up drag state, even if an error occurs
+          setDraggedTabId(null);
+          setDropIndicatorIndex(null);
+      }
   };
 
   const handleDragLeaveTabBar = () => {
