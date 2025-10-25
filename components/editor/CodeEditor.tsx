@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import type { Problem } from '../../game/types';
 import { getSuggestions, getCodeCompletion } from '../../editor/completions';
 
@@ -98,22 +98,31 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, p
     const decorationsRef = useRef<string[]>([]);
 
     // Helper to check keybindings from settings
-    const checkKeybinding = (e: any, binding: string): boolean => {
+    const checkKeybinding = useCallback((e: any, binding: string): boolean => {
+        const monaco = monacoRef.current;
         if (!binding || !monaco) return false;
-        const parts = binding.split('+').map(p => p.trim().toLowerCase());
-        const key = parts.pop();
-        if (!key) return false;
+        
+        const bindingParts = binding.split('+').map(p => p.trim().toLowerCase());
+        const bindingKey = bindingParts.pop();
+        if (!bindingKey) return false;
 
-        const eventKey = monaco.KeyCode[e.keyCode] || e.browserEvent.key;
-        if (eventKey.toLowerCase() !== key.toLowerCase()) return false;
+        const eventKey = e.browserEvent.key.toLowerCase();
+        
+        // Direct key match (e.g., 'a', 'enter', 'tab')
+        if (eventKey !== bindingKey) return false;
 
-        if (parts.includes('control') && !e.ctrlKey) return false;
-        if (parts.includes('alt') && !e.altKey) return false;
-        if (parts.includes('shift') && !e.shiftKey) return false;
-        if (parts.includes('meta') && !e.metaKey) return false;
+        // Strict modifier match: ensure all modifiers in the binding are pressed,
+        // and no modifiers *not* in the binding are pressed.
+        const bindingHas = (mod: string) => bindingParts.some(p => p.includes(mod));
+        
+        if (bindingHas('control') !== e.ctrlKey) return false;
+        if (bindingHas('alt') !== e.altKey) return false;
+        if (bindingHas('shift') !== e.shiftKey) return false;
+        if (bindingHas('meta') !== e.metaKey) return false;
         
         return true;
-    };
+    }, []);
+
 
     // Effect to initialize the editor instance. Runs only once.
     useEffect(() => {
@@ -164,22 +173,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, p
                 
                 editorInstance.onDidChangeCursorPosition((e: any) => {
                     onCursorChange({ line: e.position.lineNumber, column: e.position.column });
-                });
-
-                editorInstance.onKeyDown((e: any) => {
-                    if(checkKeybinding(e, settings.keybindings.acceptAiCompletion)) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        editorInstance.trigger('keyboard', 'editor.action.inlineSuggest.commit', null);
-                    } else if (checkKeybinding(e, settings.keybindings.cycleAiCompletionDown)) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        editorInstance.trigger('keyboard', 'editor.action.inlineSuggest.showNext', null);
-                    } else if (checkKeybinding(e, settings.keybindings.cycleAiCompletionUp)) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        editorInstance.trigger('keyboard', 'editor.action.inlineSuggest.showPrevious', null);
-                    }
                 });
 
                 editorInstance.addAction({
@@ -245,6 +238,37 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, p
             editorRef.current.setValue(code);
         }
     }, [code, isEditorMounted]);
+
+     // Effect to handle dynamic keybindings from settings
+    useEffect(() => {
+        if (!isEditorMounted || !editorRef.current) return;
+
+        const editorInstance = editorRef.current;
+
+        // Register the keydown listener. This will be re-registered if settings change.
+        const keyDownDisposable = editorInstance.onKeyDown((e: any) => {
+            if (checkKeybinding(e, settings.keybindings.acceptAiCompletion)) {
+                e.preventDefault();
+                e.stopPropagation();
+                editorInstance.trigger('keyboard', 'editor.action.inlineSuggest.commit', null);
+            } else if (checkKeybinding(e, settings.keybindings.cycleAiCompletionDown)) {
+                e.preventDefault();
+                e.stopPropagation();
+                editorInstance.trigger('keyboard', 'editor.action.inlineSuggest.showNext', null);
+            } else if (checkKeybinding(e, settings.keybindings.cycleAiCompletionUp)) {
+                e.preventDefault();
+                e.stopPropagation();
+                editorInstance.trigger('keyboard', 'editor.action.inlineSuggest.showPrevious', null);
+            }
+        });
+
+        // The cleanup function will be called when the component unmounts
+        // or when the dependencies (settings) change, before the effect runs again.
+        return () => {
+            keyDownDisposable.dispose();
+        };
+    }, [isEditorMounted, settings, checkKeybinding]);
+
 
     // Effect to handle language changes (including setting providers)
     useEffect(() => {
