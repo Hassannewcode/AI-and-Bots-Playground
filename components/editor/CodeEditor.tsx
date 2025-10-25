@@ -89,6 +89,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, p
     const editorRef = useRef<any>(null);
     const completionProviderRef = useRef<any>(null);
     const inlineCompletionProviderRef = useRef<any>(null);
+    const pressedKeysRef = useRef(new Set<string>());
     const [isEditorMounted, setIsEditorMounted] = useState(false);
     const debouncedCompletionFetcher = useRef<((...args: any[]) => void) | null>(null);
 
@@ -96,33 +97,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, p
     const monacoRef = useRef<any>(null);
     const [initialCode] = useState<string>(code);
     const decorationsRef = useRef<string[]>([]);
-
-    // Helper to check keybindings from settings
-    const checkKeybinding = useCallback((e: any, binding: string): boolean => {
-        const monaco = monacoRef.current;
-        if (!binding || !monaco) return false;
-        
-        const bindingParts = binding.split('+').map(p => p.trim().toLowerCase());
-        const bindingKey = bindingParts.pop();
-        if (!bindingKey) return false;
-
-        const eventKey = e.browserEvent.key.toLowerCase();
-        
-        // Direct key match (e.g., 'a', 'enter', 'tab')
-        if (eventKey !== bindingKey) return false;
-
-        // Strict modifier match: ensure all modifiers in the binding are pressed,
-        // and no modifiers *not* in the binding are pressed.
-        const bindingHas = (mod: string) => bindingParts.some(p => p.includes(mod));
-        
-        if (bindingHas('control') !== e.ctrlKey) return false;
-        if (bindingHas('alt') !== e.altKey) return false;
-        if (bindingHas('shift') !== e.shiftKey) return false;
-        if (bindingHas('meta') !== e.metaKey) return false;
-        
-        return true;
-    }, []);
-
 
     // Effect to initialize the editor instance. Runs only once.
     useEffect(() => {
@@ -244,30 +218,93 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, p
         if (!isEditorMounted || !editorRef.current) return;
 
         const editorInstance = editorRef.current;
+        const pressedKeys = pressedKeysRef.current;
 
-        // Register the keydown listener. This will be re-registered if settings change.
+        const KEY_DISPLAY_TO_CODE_MAP: Record<string, string> = {
+            'left control': 'ControlLeft', 'right control': 'ControlRight',
+            'left alt': 'AltLeft', 'right alt': 'AltRight',
+            'left shift': 'ShiftLeft', 'right shift': 'ShiftRight',
+            'left meta': 'MetaLeft', 'right meta': 'MetaRight',
+            'tab': 'Tab', 'space': 'Space', 'enter': 'Enter', 'backspace': 'Backspace', 'escape': 'Escape',
+            'up': 'ArrowUp', 'down': 'ArrowDown', 'left': 'ArrowLeft', 'right': 'ArrowRight',
+            'pageup': 'PageUp', 'pagedown': 'PageDown', 'end': 'End', 'home': 'Home',
+            'delete': 'Delete', 'insert': 'Insert',
+            '`': 'Backquote', '-': 'Minus', '=': 'Equal', ';': 'Semicolon', "'": 'Quote',
+            ',': 'Comma', '.': 'Period', '/': 'Slash', '\\': 'Backslash',
+            '[': 'BracketLeft', ']': 'BracketRight',
+        };
+
+        const parseBindingToCodes = (binding: string): Set<string> => {
+            const codes = new Set<string>();
+            if (!binding) return codes;
+            const parts = binding.split('+').map(p => p.trim().toLowerCase());
+
+            for (const part of parts) {
+                if (KEY_DISPLAY_TO_CODE_MAP[part]) {
+                    codes.add(KEY_DISPLAY_TO_CODE_MAP[part]);
+                } else if (part.length === 1 && part >= 'a' && part <= 'z') {
+                    codes.add(`Key${part.toUpperCase()}`);
+                } else if (part.length === 1 && part >= '0' && part <= '9') {
+                    codes.add(`Digit${part}`);
+                } else if (part.startsWith('num ') && part.length > 4) {
+                    const numpadKey = part.substring(4);
+                    const parsedNum = parseInt(numpadKey, 10);
+                    if (!isNaN(parsedNum)) {
+                        codes.add(`Numpad${numpadKey}`);
+                    } else {
+                        codes.add(`Numpad${numpadKey.charAt(0).toUpperCase() + numpadKey.slice(1)}`);
+                    }
+                } else if (/^f([1-9]|1[0-9]|2[0-4])$/.test(part)) {
+                    codes.add(part.toUpperCase());
+                } else {
+                    codes.add(part.charAt(0).toUpperCase() + part.slice(1));
+                }
+            }
+            return codes;
+        };
+        
+        const checkBinding = (binding: string) => {
+            const requiredCodes = parseBindingToCodes(binding);
+            if (requiredCodes.size === 0 || pressedKeys.size !== requiredCodes.size) {
+                return false;
+            }
+            for (const code of requiredCodes) {
+                if (!pressedKeys.has(code)) return false;
+            }
+            return true;
+        };
+
         const keyDownDisposable = editorInstance.onKeyDown((e: any) => {
-            if (checkKeybinding(e, settings.keybindings.acceptAiCompletion)) {
-                e.preventDefault();
-                e.stopPropagation();
+            // Prevent repeated events for held keys, allowing combos to be checked once
+            if (e.browserEvent.repeat) return;
+            pressedKeys.add(e.browserEvent.code);
+
+            if (checkBinding(settings.keybindings.acceptAiCompletion)) {
+                e.preventDefault(); e.stopPropagation();
                 editorInstance.trigger('keyboard', 'editor.action.inlineSuggest.commit', null);
-            } else if (checkKeybinding(e, settings.keybindings.cycleAiCompletionDown)) {
-                e.preventDefault();
-                e.stopPropagation();
+            } else if (checkBinding(settings.keybindings.cycleAiCompletionDown)) {
+                e.preventDefault(); e.stopPropagation();
                 editorInstance.trigger('keyboard', 'editor.action.inlineSuggest.showNext', null);
-            } else if (checkKeybinding(e, settings.keybindings.cycleAiCompletionUp)) {
-                e.preventDefault();
-                e.stopPropagation();
+            } else if (checkBinding(settings.keybindings.cycleAiCompletionUp)) {
+                e.preventDefault(); e.stopPropagation();
                 editorInstance.trigger('keyboard', 'editor.action.inlineSuggest.showPrevious', null);
             }
         });
 
-        // The cleanup function will be called when the component unmounts
-        // or when the dependencies (settings) change, before the effect runs again.
+        const keyUpDisposable = editorInstance.onKeyUp((e: any) => {
+            pressedKeys.delete(e.browserEvent.code);
+        });
+
+        const blurDisposable = editorInstance.onDidBlurEditorWidget(() => {
+            pressedKeys.clear();
+        });
+
         return () => {
             keyDownDisposable.dispose();
+            keyUpDisposable.dispose();
+            blurDisposable.dispose();
         };
-    }, [isEditorMounted, settings, checkKeybinding]);
+    }, [isEditorMounted, settings]);
 
 
     // Effect to handle language changes (including setting providers)

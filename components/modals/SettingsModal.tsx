@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useRef, useEffect } from 'react';
 import { produce } from 'immer';
 import type { PanelComponentKey, PanelLayout } from '../../game/types';
@@ -57,12 +53,12 @@ const KeybindingInput: React.FC<{ label: string, value: string, onChange: (value
     const [keys, setKeys] = useState<Set<string>>(new Set());
     const wrapperRef = useRef<HTMLDivElement>(null);
 
-    const formatKeys = (keys: Set<string>): string => {
-        if (keys.size === 0) return 'Press keys...';
+    const formatKeys = (keysSet: Set<string>): string => {
+        if (keysSet.size === 0) return 'Press keys...';
 
         const order = ['ControlLeft', 'ControlRight', 'AltLeft', 'AltRight', 'ShiftLeft', 'ShiftRight', 'MetaLeft', 'MetaRight'];
         
-        const sortedKeys = Array.from(keys).sort((a, b) => {
+        const sortedKeys = Array.from(keysSet).sort((a, b) => {
             const aIsModifier = order.includes(a);
             const bIsModifier = order.includes(b);
             if (aIsModifier && bIsModifier) return order.indexOf(a) - order.indexOf(b);
@@ -72,6 +68,7 @@ const KeybindingInput: React.FC<{ label: string, value: string, onChange: (value
         });
 
         const formatted = sortedKeys.map(code => {
+            // Modifiers
             if (code === 'ControlLeft') return 'Left Control';
             if (code === 'ControlRight') return 'Right Control';
             if (code === 'AltLeft') return 'Left Alt';
@@ -80,10 +77,31 @@ const KeybindingInput: React.FC<{ label: string, value: string, onChange: (value
             if (code === 'ShiftRight') return 'Right Shift';
             if (code === 'MetaLeft') return 'Left Meta';
             if (code === 'MetaRight') return 'Right Meta';
+            
+            // Whitespace & Editing
+            if (code === 'Tab') return 'Tab';
+            if (code === 'Space') return 'Space';
+            if (code === 'Enter') return 'Enter';
+            if (code === 'Backspace') return 'Backspace';
+            if (code === 'Escape') return 'Escape';
+            if (code === 'Delete') return 'Delete';
+            if (code === 'Insert') return 'Insert';
+
+            // Arrows & Navigation
             if (code.startsWith('Arrow')) return code.replace('Arrow', '');
+            if (code === 'PageUp') return 'PageUp';
+            if (code === 'PageDown') return 'PageDown';
+            if (code === 'End') return 'End';
+            if (code === 'Home') return 'Home';
+
+            // Alphanumeric
             if (code.startsWith('Key')) return code.substring(3);
             if (code.startsWith('Digit')) return code.substring(5);
+
+            // Numpad
             if (code.startsWith('Numpad')) return code.replace('Numpad', 'Num ');
+
+            // Symbols
             if (code === 'Backquote') return '`';
             if (code === 'Minus') return '-';
             if (code === 'Equal') return '=';
@@ -96,7 +114,10 @@ const KeybindingInput: React.FC<{ label: string, value: string, onChange: (value
             if (code === 'BracketLeft') return '[';
             if (code === 'BracketRight') return ']';
 
-            return code;
+            // Function Keys
+            if (/^F([1-9]|1[0-9]|2[0-4])$/.test(code)) return code;
+
+            return code; // Fallback for other keys like CapsLock
         });
 
         return formatted.join(' + ');
