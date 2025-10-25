@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import type { FileSystemTree, FileSystemNode } from '../../game/types';
 
@@ -86,13 +87,32 @@ const NewItemModal: React.FC<NewItemModalProps> = ({ type, parentId, fileSystem,
                                 >
                                     <option value=".py">.py</option>
                                     <option value=".js">.js</option>
+                                    <option value=".jsx">.jsx</option>
                                     <option value=".ts">.ts</option>
+                                    <option value=".tsx">.tsx</option>
                                     <option value=".html">.html</option>
+                                    <option value=".css">.css</option>
+                                    <option value=".sh">.sh</option>
+                                    <option value=".c">.c</option>
                                     <option value=".cpp">.cpp</option>
                                     <option value=".cs">.cs</option>
-                                    <option value=".java">.java</option>
+                                    <option value=".clj">.clj</option>
+                                    <option value=".dart">.dart</option>
+                                    <option value=".fs">.fs</option>
                                     <option value=".go">.go</option>
+                                    <option value=".groovy">.groovy</option>
+                                    <option value=".hs">.hs</option>
+                                    <option value=".java">.java</option>
+                                    <option value=".kt">.kt</option>
+                                    <option value=".lua">.lua</option>
+                                    <option value=".m">.m</option>
+                                    <option value=".ml">.ml</option>
+                                    <option value=".pl">.pl</option>
+                                    <option value=".php">.php</option>
+                                    <option value=".rb">.rb</option>
                                     <option value=".rs">.rs</option>
+                                    <option value=".scala">.scala</option>
+                                    <option value=".swift">.swift</option>
                                     <option value=".md">.md</option>
                                     <option value=".txt">.txt</option>
                                 </select>

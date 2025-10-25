@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import CodeEditor from '../editor/CodeEditor';
-import type { FileSystemTree, Problem } from '../../game/types';
+import type { FileSystemTree, Problem, EditorCommand } from '../../game/types';
 import { FileIcon, XMarkIcon, PlusIcon } from '../icons';
+import { formatCode } from '../../game/gemini';
+import { EditorStatusBar } from '../editor/EditorStatusBar';
+import { CommandPalette } from '../editor/CommandPalette';
 
 interface EditorPanelProps {
     actions: { id: string; icon: React.ReactNode; onClick: () => void; }[];
@@ -26,6 +29,34 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dropIndicatorIndex, setDropIndicatorIndex] = useState<number | null>(null);
+
+  const [isPaletteOpen, setPaletteOpen] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
+  const [isFormatting, setIsFormatting] = useState(false);
+
+  const handleFormatDocument = useCallback(async () => {
+    if (isFormatting || !activeFile || activeFile.type !== 'file') return;
+    setIsFormatting(true);
+    try {
+        const formatted = await formatCode(code, activeLanguage);
+        onCodeChange(formatted);
+    } catch (e) {
+        console.error("Failed to format code:", e);
+        // Optionally, you could set an error state to show a notification
+    } finally {
+        setIsFormatting(false);
+    }
+  }, [code, activeLanguage, activeFile, onCodeChange, isFormatting]);
+
+  const commands: EditorCommand[] = [
+    {
+        id: 'formatDocument',
+        label: isFormatting ? 'Formatting document...' : 'Format Document',
+        action: handleFormatDocument,
+    },
+    // More commands can be added here, e.g., for toggling settings
+  ];
+
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, tabId: string) => {
       e.dataTransfer.setData('application/tab-id', tabId);
@@ -79,6 +110,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
 
   return (
     <div className="flex-grow bg-[#1e2026] rounded-lg flex flex-col text-sm font-mono border border-[#3a3d46]">
+       <CommandPalette 
+            isOpen={isPaletteOpen}
+            onClose={() => setPaletteOpen(false)}
+            commands={commands}
+        />
       {/* Tab Bar */}
       <div className="h-10 flex items-center bg-[#272a33] border-b border-[#3a3d46] text-gray-400">
         <div 
@@ -140,6 +176,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
               language={activeLanguage}
               problems={activeFileProblems}
               settings={settings}
+              onCursorChange={setCursorPosition}
+              onOpenPalette={() => setPaletteOpen(true)}
             />
         ) : (
             <div className="absolute inset-0 flex items-center justify-center text-gray-500">
@@ -147,6 +185,10 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
             </div>
         )}
       </div>
+       <EditorStatusBar 
+            language={activeLanguage}
+            cursorPosition={cursorPosition}
+        />
     </div>
   );
 };

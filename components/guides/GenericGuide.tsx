@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 
 interface GenericGuideProps {
@@ -15,8 +16,7 @@ export const GenericGuide: React.FC<GenericGuideProps> = ({ language }) => (
                 This IDE provides syntax highlighting for many languages, including <span className="font-semibold text-white uppercase">{language}</span>.
             </p>
             <p className="text-slate-300 text-xs mt-2">
-                However, direct execution of the sprite engine commands is only supported in Python and JavaScript.
-                When you run this file, its execution will be <span className="font-semibold text-white">simulated</span> in the console.
+                A simulated execution environment is available for popular languages like Python, JavaScript, C#, and Rust. For other file types, you can still use the full-featured editor.
             </p>
         </div>
     </div>

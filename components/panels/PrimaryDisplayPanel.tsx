@@ -35,7 +35,7 @@ const SpriteComponent: React.FC<{ sprite: Sprite, isRewardFlashing: boolean }> =
                 {sprite.message.text}
             </div>
         )}
-        <div className={isRewardFlashing ? 'reward-flash-animation rounded-full' : ''}>
+        <div className={isRewardFlashing ? 'reward-flash-animation' : ''}>
              {getIconForShape(sprite.shape, 'w-12 h-12')}
         </div>
     </div>
@@ -44,8 +44,9 @@ const SpriteComponent: React.FC<{ sprite: Sprite, isRewardFlashing: boolean }> =
 export const PrimaryDisplayPanel: React.FC<PrimaryDisplayPanelProps> = ({ 
     controls, currentFrame, totalFrames, gameState, onMuteToggle, isMuted, onShare, onFullscreen 
 }) => {
+    // FIX: Used flatMap for robust, type-safe filtering and mapping of effects.
     const rewardEffectSpriteIds = new Set(
-        gameState.effects.filter(e => e.type === 'rewardflash').map(e => e.spriteId)
+        gameState.effects.flatMap(e => (e.type === 'rewardflash' ? [e.spriteId] : []))
     );
 
     return (

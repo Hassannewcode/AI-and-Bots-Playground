@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import type { Problem } from '../../game/types';
 import { getSuggestions, getCodeCompletion } from '../../editor/completions';
@@ -31,15 +30,41 @@ interface CodeEditorProps {
   language: string;
   problems: Problem[];
   settings: Settings;
+  onCursorChange: (position: { line: number, column: number }) => void;
+  onOpenPalette: () => void;
 }
 
 const mapLanguageToMonaco = (lang: string): string => {
     switch (lang) {
         case 'py': return 'python';
         case 'js': return 'javascript';
+        case 'jsx': return 'javascript';
         case 'ts': return 'typescript';
+        case 'tsx': return 'typescript';
         case 'md': return 'markdown';
+        case 'html': return 'html';
+        case 'css': return 'css';
+        case 'sh': return 'shell';
+        case 'c': return 'c';
+        case 'cpp': return 'cpp';
         case 'cs': return 'csharp';
+        case 'clj': return 'clojure';
+        case 'dart': return 'dart';
+        case 'fs': return 'fsharp';
+        case 'go': return 'go';
+        case 'groovy': return 'groovy';
+        case 'hs': return 'haskell';
+        case 'java': return 'java';
+        case 'kt': return 'kotlin';
+        case 'lua': return 'lua';
+        case 'm': return 'objective-c';
+        case 'ml': return 'ocaml';
+        case 'pl': return 'perl';
+        case 'php': return 'php';
+        case 'rb': return 'ruby';
+        case 'rs': return 'rust';
+        case 'scala': return 'scala';
+        case 'swift': return 'swift';
         default: return lang;
     }
 };
@@ -59,13 +84,18 @@ const mapSuggestionTypeToMonacoKind = (type: string) => {
     }
 };
 
-const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, problems, settings }) => {
+const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, problems, settings, onCursorChange, onOpenPalette }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<any>(null);
     const completionProviderRef = useRef<any>(null);
     const inlineCompletionProviderRef = useRef<any>(null);
     const [isEditorMounted, setIsEditorMounted] = useState(false);
     const debouncedCompletionFetcher = useRef<((...args: any[]) => void) | null>(null);
+
+    // For line change decorations
+    const monacoRef = useRef<any>(null);
+    const [initialCode] = useState<string>(code);
+    const decorationsRef = useRef<string[]>([]);
 
     // Helper to check keybindings from settings
     const checkKeybinding = (e: any, binding: string): boolean => {
@@ -92,41 +122,87 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, p
 
         const initializeEditor = () => {
             if (!containerRef.current) return; // Guard against unmount during async load
+            try {
+                monacoRef.current = monaco; // Store monaco object for later use
 
-            editorInstance = monaco.editor.create(containerRef.current, {
-                value: code,
-                language: mapLanguageToMonaco(language),
-                theme: 'vs-dark',
-                automaticLayout: true,
-                fontFamily: 'Roboto Mono, monospace',
-                fontSize: 14,
-                minimap: { enabled: false },
-                scrollbar: {
-                    verticalScrollbarSize: 10,
-                    horizontalScrollbarSize: 10,
-                },
-                wordWrap: 'on',
-                'semanticHighlighting.enabled': true,
-                inlineSuggest: {
-                    enabled: true,
+                editorInstance = monaco.editor.create(containerRef.current, {
+                    value: code,
+                    language: mapLanguageToMonaco(language),
+                    theme: 'vs-dark',
+                    automaticLayout: true,
+                    fontFamily: 'Roboto Mono, monospace',
+                    fontSize: 14,
+                    scrollbar: {
+                        verticalScrollbarSize: 10,
+                        horizontalScrollbarSize: 10,
+                    },
+                    wordWrap: 'on',
+                    'semanticHighlighting.enabled': true,
+                    inlineSuggest: {
+                        enabled: true,
+                        showToolbar: 'onHover',
+                        renderLineHighlight: 'gutter',
+                    },
+                    // Additions for visual feedback and functionality
+                    glyphMargin: true,
+                    cursorBlinking: 'smooth',
+                    cursorSmoothCaretAnimation: 'on',
+                    // Explicit cursor styling for better precision
+                    cursorStyle: 'line',
+                    cursorWidth: 2,
+                    minimap: { enabled: true },
+                    folding: true,
+                    'bracketPairColorization.enabled': true,
+                });
+
+                editorInstance.onDidChangeModelContent(() => {
+                    const currentValue = editorInstance.getValue();
+                    onCodeChange(currentValue);
+                });
+                
+                editorInstance.onDidChangeCursorPosition((e: any) => {
+                    onCursorChange({ line: e.position.lineNumber, column: e.position.column });
+                });
+
+                editorInstance.onKeyDown((e: any) => {
+                    if(checkKeybinding(e, settings.keybindings.acceptAiCompletion)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        editorInstance.trigger('keyboard', 'editor.action.inlineSuggest.commit', null);
+                    } else if (checkKeybinding(e, settings.keybindings.cycleAiCompletionDown)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        editorInstance.trigger('keyboard', 'editor.action.inlineSuggest.showNext', null);
+                    } else if (checkKeybinding(e, settings.keybindings.cycleAiCompletionUp)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        editorInstance.trigger('keyboard', 'editor.action.inlineSuggest.showPrevious', null);
+                    }
+                });
+
+                editorInstance.addAction({
+                    id: 'open-command-palette',
+                    label: 'Open Command Palette',
+                    keybindings: [monaco.KeyCode.F1],
+                    run: () => {
+                        onOpenPalette();
+                    }
+                });
+
+                editorRef.current = editorInstance;
+                setIsEditorMounted(true);
+            } catch (error) {
+                console.error("Failed to initialize Monaco Editor:", error);
+                if (containerRef.current) {
+                    containerRef.current.innerHTML = `
+                        <div style="color: #ff8a8a; background-color: #1e2026; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 1rem; font-family: sans-serif;">
+                            <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Editor Failed to Load</h3>
+                            <p style="text-align: center; font-size: 0.875rem; color: #d1d5db;">There was an issue initializing the code editor. This can sometimes happen due to network issues or browser extension conflicts.</p>
+                             <p style="text-align: center; font-size: 0.875rem; color: #d1d5db; margin-top: 0.5rem;">Please try reloading the page.</p>
+                        </div>
+                    `;
                 }
-            });
-
-            editorInstance.onDidChangeModelContent(() => {
-                const currentValue = editorInstance.getValue();
-                onCodeChange(currentValue);
-            });
-
-            editorInstance.onKeyDown((e: any) => {
-                if(checkKeybinding(e, settings.keybindings.acceptAiCompletion)) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    editorInstance.trigger('keyboard', 'editor.action.inlineSuggest.commit', null);
-                }
-            });
-
-            editorRef.current = editorInstance;
-            setIsEditorMounted(true);
+            }
         };
         
         if (containerRef.current && !editorRef.current) {
@@ -203,7 +279,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, p
                 // Resolve with empty to avoid breaking the UI on API errors.
                 resolve({ items: [] }); 
             }
-        }, 500); // 500ms delay
+        }, 300); // 300ms delay
 
 
         // Register new providers
@@ -256,6 +332,41 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, p
         monaco.editor.setModelMarkers(model, 'owner', markers);
 
     }, [problems, isEditorMounted]);
+
+    // Debounced function to update line decorations
+    const debouncedUpdateDecorations = useRef(debounce((currentCode: string, initial: string, editor: any, monaco: any) => {
+        if (!editor || !monaco) return;
+
+        const initialLines = initial.split('\n');
+        const currentLines = currentCode.split('\n');
+        const changedLineNumbers: number[] = [];
+        const len = Math.max(initialLines.length, currentLines.length);
+
+        for (let i = 0; i < len; i++) {
+            // A line is considered changed if it's different, new, or was deleted (which makes subsequent lines different)
+            if (currentLines[i] !== initialLines[i]) {
+                changedLineNumbers.push(i + 1); // Monaco lines are 1-based
+            }
+        }
+
+        const newDecorations = changedLineNumbers.map(lineNumber => ({
+            range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+            options: {
+                isWholeLine: true,
+                className: 'edited-line-highlight',
+                glyphMarginClassName: 'edited-line-glyph'
+            }
+        }));
+        
+        decorationsRef.current = editor.deltaDecorations(decorationsRef.current, newDecorations);
+    }, 300)).current;
+
+    // Effect to track code changes and apply decorations
+    useEffect(() => {
+        if (isEditorMounted && editorRef.current && monacoRef.current) {
+            debouncedUpdateDecorations(code, initialCode, editorRef.current, monacoRef.current);
+        }
+    }, [code, isEditorMounted, initialCode, debouncedUpdateDecorations]);
 
     return <div ref={containerRef} className="h-full w-full" />;
 };

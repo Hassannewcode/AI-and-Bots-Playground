@@ -13,7 +13,7 @@ interface InfoCardProps {
 }
 
 const InfoCard: React.FC<InfoCardProps> = ({ title, icon, stats }) => (
-    <div className="bg-[#1e2026] rounded-md flex p-2 h-20 w-full text-left transition-colors">
+    <div className="bg-[#1e2026] rounded-md flex p-2 h-20 w-full text-left transition-colors border border-transparent card-hover-effect">
         <div className="w-10 h-10 rounded-full flex-shrink-0 bg-[#272a33]">{icon}</div>
         <div className="ml-2 flex-grow overflow-hidden flex flex-col">
             <p className="font-bold text-white text-base leading-tight truncate flex-shrink-0">{title}</p>

@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 
 interface UserDetailsPanelProps {
@@ -18,7 +19,7 @@ export const UserDetailsPanel: React.FC<UserDetailsPanelProps> = ({ user, onDele
       <div className="bg-[#1e2026] p-2 rounded-md text-center">
           <div className="relative w-20 h-20 mx-auto bg-[#272a33] rounded-md">
               {user.avatar}
-              <div className="absolute bottom-0 left-0 right-0 bg-red-600/80 text-white text-xs font-bold py-0.5">{user.status}</div>
+              <div className="absolute bottom-0 left-0 right-0 bg-green-600/80 text-white text-xs font-bold py-0.5">{user.status}</div>
           </div>
           <p className="mt-2 font-bold text-white">{user.name}</p>
           <div className="flex items-center justify-center text-gray-400 mt-1">

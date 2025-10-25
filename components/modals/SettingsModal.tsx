@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { produce } from 'immer';
 import type { PanelComponentKey, PanelLayout } from '../../game/types';
@@ -165,7 +166,7 @@ const KeybindingInput: React.FC<{ label: string, value: string, onChange: (value
                 <button
                     type="button"
                     onClick={handleMainClick}
-                    className="w-48 bg-[#1e2026] border border-[#3a3d46] rounded-md px-2 py-1 text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-teal-500 min-h-[34px]"
+                    className="w-48 bg-[#1e2026] border border-[#3a3d46] rounded-md px-2 py-1 text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[34px]"
                 >
                     {isListening ? (keys.size > 0 ? formatKeys(keys) : 'Press keys...') : value}
                 </button>
@@ -182,8 +183,8 @@ const KeybindingInput: React.FC<{ label: string, value: string, onChange: (value
 
 
 const RadioOption: React.FC<{ label: string, description: string, value: string, checked: boolean, onChange: () => void }> = ({ label, description, value, checked, onChange }) => (
-  <label className={`flex items-center p-3 rounded-md border-2 cursor-pointer ${checked ? 'border-teal-500 bg-teal-900/50' : 'border-[#3a3d46] bg-[#1e2026] hover:border-gray-500'}`}>
-    <input type="radio" name="pythonEngine" value={value} checked={checked} onChange={onChange} className="h-4 w-4 accent-teal-500 bg-gray-800 border-gray-600" />
+  <label className={`flex items-center p-3 rounded-md border-2 cursor-pointer ${checked ? 'border-blue-500 bg-blue-900/50' : 'border-[#3a3d46] bg-[#1e2026] hover:border-gray-500'}`}>
+    <input type="radio" name="pythonEngine" value={value} checked={checked} onChange={onChange} className="h-4 w-4 accent-blue-500 bg-gray-800 border-gray-600" />
     <div className="ml-3">
       <p className="text-sm font-semibold text-white">{label}</p>
       <p className="text-xs text-gray-400">{description}</p>
@@ -218,19 +219,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, settings, setSet
                 <div className="flex border-b border-[#3a3d46] text-sm font-semibold">
                     <button 
                         onClick={() => setActiveTab('layout')}
-                        className={`px-4 py-2 transition-colors ${activeTab === 'layout' ? 'text-white border-b-2 border-teal-500' : 'text-gray-400 hover:text-white'}`}
+                        className={`px-4 py-2 transition-colors ${activeTab === 'layout' ? 'text-white border-b-2 border-blue-500' : 'text-gray-400 hover:text-white'}`}
                     >
                         Layout
                     </button>
                     <button 
                         onClick={() => setActiveTab('keybindings')}
-                        className={`px-4 py-2 transition-colors ${activeTab === 'keybindings' ? 'text-white border-b-2 border-teal-500' : 'text-gray-400 hover:text-white'}`}
+                        className={`px-4 py-2 transition-colors ${activeTab === 'keybindings' ? 'text-white border-b-2 border-blue-500' : 'text-gray-400 hover:text-white'}`}
                     >
                         Keybindings
                     </button>
                     <button
                         onClick={() => setActiveTab('runtimes')}
-                        className={`px-4 py-2 transition-colors ${activeTab === 'runtimes' ? 'text-white border-b-2 border-teal-500' : 'text-gray-400 hover:text-white'}`}
+                        className={`px-4 py-2 transition-colors ${activeTab === 'runtimes' ? 'text-white border-b-2 border-blue-500' : 'text-gray-400 hover:text-white'}`}
                     >
                         Runtimes
                     </button>
@@ -307,7 +308,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, settings, setSet
                                     <div className="pl-8 mt-2">
                                         <button 
                                             onClick={onCustomizeLayout}
-                                            className="text-sm bg-teal-700 hover:bg-teal-600 text-white font-semibold py-1 px-3 rounded-md transition-colors"
+                                            className="text-sm bg-blue-700 hover:bg-blue-600 text-white font-semibold py-1 px-3 rounded-md transition-colors"
                                         >
                                             Customize Layout...
                                         </button>
@@ -318,7 +319,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, settings, setSet
                     )}
                 </div>
 
-                <button onClick={onClose} className="mt-8 w-full sm:w-auto bg-teal-600 hover:bg-teal-500 text-white font-bold py-2 px-4 rounded-md">
+                <button onClick={onClose} className="mt-8 w-full sm:w-auto bg-blue-700 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md">
                     Close
                 </button>
             </div>

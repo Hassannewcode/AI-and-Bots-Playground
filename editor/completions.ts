@@ -258,20 +258,25 @@ export const getCodeCompletion = async (
     const codeWithCursor = `${fullCode.substring(0, cursorPosition)}<CURSOR>${fullCode.substring(cursorPosition)}`;
     const langName = language === 'py' ? 'Python' : 'JavaScript';
 
-    const prompt = `You are an expert code completion AI, acting as a direct assistant within an IDE. Your task is to predict and generate the next logical block of code based on the user's current file content and cursor position.
+    const prompt = `You are an intelligent pair-programming assistant integrated into a web-based IDE. Your primary function is to provide highly-contextual, adaptive code completions that anticipate the user's next move.
 
-Follow these rules strictly:
-1.  Analyze the entire code to understand context, variables, and user intent. The user's cursor is marked with "<CURSOR>".
-2.  Provide up to 5 diverse and useful code suggestions.
-3.  Suggestions can be single-line or multi-line.
-4.  Return ONLY a valid JSON array of strings. Example: ["suggestion1_code_string", "suggestion2_code_string"]
-5.  Do NOT include the user's existing code in your suggestions. Only provide the new code to be inserted at the <CURSOR> position.
-6.  If the user is in the middle of a line, complete that line. If they are at the end of a line, suggest the next complete line or block of code.
-7.  Do not add any explanations, markdown, or anything outside of the JSON array.
+**Core Directives:**
 
-LANGUAGE: ${langName}
+1.  **Analyze Holistically:** Deeply analyze the user's code, including variables, function definitions, overall structure, and the custom game engine API (\`ai\`, \`world\`, \`physics\`). The cursor's position is marked by "<CURSOR>".
+2.  **Adapt to Style:** Your suggestions MUST match the user's coding style (indentation, naming conventions, use of whitespace).
+3.  **Anticipate Intent:** Go beyond simple line completion. If the user is starting a loop, suggest the entire loop body. If they define a sprite, suggest the next logical actions for that sprite. Think one or two steps ahead.
+4.  **Provide Diverse Options:** Generate up to 3 distinct, high-quality suggestions. They should offer different approaches or levels of completion (e.g., one simple completion, one more complex block).
+5.  **Strict JSON Output:** Return ONLY a valid JSON array of strings. Each string is a code suggestion. Do not include explanations, markdown, or the user's existing code.
 
-USER'S CODE:
+**Example Task:**
+If the user's code is \`bot = ai.Sprite(name="B-101")\\n<CURSOR>\`, you might suggest:
+- \`bot.go_to(x=80, y=20)\`
+- \`bot.say(message="I'm ready!")\`
+- \`for i in range(5):\\n    bot.move_to(x=i*10, y=50, speed=0.5)\\n    ai.wait(0.5)\`
+
+**LANGUAGE:** ${langName}
+
+**USER'S CODE:**
 ---
 ${codeWithCursor}
 ---

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import type { FileSystemTree, FileSystemNode } from '../../game/types';
 import { produce } from 'immer';
@@ -45,8 +46,12 @@ const getFileColor = (fileName: string) => {
     const extension = fileName.split('.').pop();
     switch (extension) {
         case 'py': return 'text-green-400';
-        case 'js': return 'text-yellow-400';
-        case 'ts': return 'text-blue-400';
+        case 'js':
+        case 'jsx':
+             return 'text-yellow-400';
+        case 'ts':
+        case 'tsx':
+             return 'text-blue-400';
         case 'html': return 'text-orange-400';
         case 'css': return 'text-sky-400'
         case 'cpp':

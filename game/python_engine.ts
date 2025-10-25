@@ -1,4 +1,5 @@
 
+
 import { Sprite, ExecutionResult, Problem, ExecutionStep, FileSystemTree } from './types';
 import { nanoid } from 'nanoid';
 
@@ -86,7 +87,13 @@ function kwargsToJs(kwargs: any): Record<string, any> {
     return kwargs.toJs({ dict_converter: Object.fromEntries });
 }
 
-export async function executePythonCode(code: string, fileSystem: FileSystemTree, fileId: string, engine: 'pyodide' | 'pyscript'): Promise<Omit<ExecutionResult, 'newState'>> {
+export async function executePythonCode(
+    code: string, 
+    fileSystem: FileSystemTree, 
+    fileId: string, 
+    engine: 'pyodide' | 'pyscript',
+    originalSource?: { code: string, language: string }
+): Promise<Omit<ExecutionResult, 'newState'>> {
     const logs: string[] = [];
     const problems: Problem[] = [];
     const steps: ExecutionStep[] = [];
@@ -236,10 +243,31 @@ export async function executePythonCode(code: string, fileSystem: FileSystemTree
         const errorMessage = e.message || "An unknown Python error occurred.";
         const tracebackRegex = /File "<exec>", line (\d+)/;
         const match = errorMessage.match(tracebackRegex);
-        const line = match ? parseInt(match[1], 10) : 1;
         
-        problems.push({ fileId, line, message: errorMessage, code, language: 'py' });
+        let finalLine = match ? parseInt(match[1], 10) : 1;
+        
+        // If this was a transpiled execution, attempt to map the error line back to the original source
+        if (originalSource && match) {
+            const pythonLineNum = parseInt(match[1], 10);
+            const pythonLines = code.split('\n');
+            if (pythonLineNum <= pythonLines.length) {
+                const errorLine = pythonLines[pythonLineNum - 1];
+                const sourceMapRegex = /#\s*src:\s*(\d+)/;
+                const sourceMapMatch = errorLine.match(sourceMapRegex);
+                if (sourceMapMatch) {
+                    finalLine = parseInt(sourceMapMatch[1], 10);
+                }
+            }
+        }
+        
+        const codeForProblem = originalSource ? originalSource.code : code;
+        const langForProblem = originalSource ? originalSource.language : 'py';
+
+        problems.push({ fileId, line: finalLine, message: errorMessage, code: codeForProblem, language: langForProblem });
         logs.push(`Execution failed.`);
+        if (originalSource) {
+            logs.push(`--- Transpiled Python Code (for debugging) ---\n${code}\n--------------------`);
+        }
     }
 
     return { logs, problems, steps, executedLines: code.split('\n').length };

@@ -142,3 +142,12 @@ export interface PanelLayout {
   middle: PanelComponentKey[];
   right: PanelComponentKey[];
 }
+
+// Editor-specific types
+export interface EditorCommand {
+  id: string;
+  label: string;
+  action: () => void | Promise<void>;
+  // Optional keybinding to display
+  keybinding?: string;
+}

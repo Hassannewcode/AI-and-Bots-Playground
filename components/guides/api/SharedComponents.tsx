@@ -11,7 +11,7 @@ export const CodeLine: React.FC<{ children: React.ReactNode, comment?: string }>
 
 export const GuideSection: React.FC<{ title: string, children: React.ReactNode }> = ({ title, children }) => (
     <div className="mb-5">
-        <h3 className="text-sm font-bold text-white mb-2 font-sans uppercase tracking-wider text-teal-400">{title}</h3>
+        <h3 className="text-sm font-bold text-white mb-2 font-sans uppercase tracking-wider text-sky-400">{title}</h3>
         <div className="border-l-2 border-gray-700 pl-4 space-y-3">
             {children}
         </div>

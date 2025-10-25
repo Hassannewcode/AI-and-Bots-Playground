@@ -1,3 +1,4 @@
+
 {
   "framework": null,
   "headers": [
@@ -9,6 +10,12 @@
     },
     {
       "source": "/(.*\\.ts)",
+      "headers": [
+        { "key": "Content-Type", "value": "text/javascript" }
+      ]
+    },
+    {
+      "source": "/(.*\\.jsx)",
       "headers": [
         { "key": "Content-Type", "value": "text/javascript" }
       ]

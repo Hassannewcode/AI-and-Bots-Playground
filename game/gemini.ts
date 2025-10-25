@@ -175,3 +175,117 @@ ${code}
         throw new Error("AI failed to generate a fix. The model's response might have been blocked or the API key is invalid.");
     }
 };
+
+export const transpileCode = async (code: string, sourceLanguage: string): Promise<string> => {
+     if (!process.env.API_KEY) {
+        throw new Error("API_KEY is not configured for transpilation.");
+    }
+    
+    const prompt = `You are an expert code transpiler. Your task is to convert code from various languages into Python.
+The target Python environment has a specific, globally available API for controlling sprites.
+
+**Target Python API:**
+- \`ai.Sprite(name="str", shape="str", x=int, y=int)\`: Creates a sprite.
+- \`sprite.go_to(x=int, y=int, speed=float)\`: Moves a sprite.
+- \`sprite.say(message="str", duration=float)\`: Makes a sprite talk.
+- \`sprite.create_network()\`: Initializes AI for the sprite.
+- \`sprite.reward(value=int)\`: Gives a reward to the sprite.
+- All other libraries like \`world\`, \`sound\`, and \`physics\` follow a similar keyword-argument style.
+
+**Instructions:**
+1.  Transpile the provided ${sourceLanguage} code into the equivalent Python code that uses the target API.
+2.  Convert all language constructs (variables, loops, conditionals, etc.) to their Python equivalents.
+3.  **Crucially**, for every generated line of Python, append a comment with the original source line number, like \`# src: 1\`, \`# src: 2\`, etc. This is for error mapping.
+4.  Your output must be ONLY the raw, runnable Python code. Do not include any explanations, markdown code fences, or anything else.
+
+**Source ${sourceLanguage} Code:**
+\`\`\`${sourceLanguage}
+${code}
+\`\`\`
+
+**Transpiled Python Code:**
+`;
+
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                temperature: 0.0,
+                stopSequences: [],
+            }
+        });
+
+        const text = response.text;
+        if (!text) {
+            throw new Error("Received an empty response from the transpiler AI.");
+        }
+        
+        // Clean up the response to ensure it's just raw code
+        const cleanedCode = text.trim().replace(/^```python\n|```$/g, '').trim();
+        return cleanedCode;
+
+    } catch (error) {
+        console.error("Error transpiling code via Gemini API:", error);
+        throw new Error("The AI failed to transpile the code. It may contain unsupported syntax or the API failed.");
+    }
+
+};
+
+export const formatCode = async (code: string, language: string): Promise<string> => {
+    if (!process.env.API_KEY) {
+        throw new Error("API_KEY is not configured for code formatting.");
+    }
+    
+    const langNameMap: Record<string, string> = {
+        py: 'Python (following PEP 8)',
+        js: 'JavaScript (like Prettier)',
+        jsx: 'JavaScript (like Prettier)',
+        ts: 'TypeScript (like Prettier)',
+        tsx: 'TypeScript (like Prettier)',
+        html: 'HTML',
+        css: 'CSS',
+    };
+    const langDisplayName = langNameMap[language] || language;
+
+    const prompt = `You are an expert code formatter. Your task is to reformat the given code snippet according to standard conventions for its language.
+- Do NOT change the logic, variable names, or functionality.
+- Only fix indentation, spacing, line breaks, and other stylistic issues.
+- Return ONLY the raw, formatted code. Do not include any explanations, markdown code fences, or anything else.
+
+LANGUAGE: ${langDisplayName}
+
+CODE TO FORMAT:
+\`\`\`${language}
+${code}
+\`\`\`
+
+FORMATTED CODE:
+`;
+
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                temperature: 0.0,
+                stopSequences: [],
+            }
+        });
+
+        const text = response.text;
+        if (!text) {
+            throw new Error("Received an empty response from the formatter AI.");
+        }
+        
+        // Clean up the response to ensure it's just raw code
+        const cleanedCode = text.trim().replace(/^```(?:\w+\n)?|```$/g, '').trim();
+        return cleanedCode;
+
+    } catch (error) {
+        console.error("Error formatting code via Gemini API:", error);
+        throw new Error("The AI failed to format the code. The response might have been blocked or the API key is invalid.");
+    }
+};

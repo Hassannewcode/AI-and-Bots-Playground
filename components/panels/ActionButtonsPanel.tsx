@@ -1,5 +1,6 @@
 
 
+
 import React from 'react';
 import { QuestionMarkCircleIcon, ArrowPathIcon } from '../icons';
 
@@ -18,7 +19,7 @@ export const ActionButtonsPanel: React.FC<ActionButtonsPanelProps> = ({ title, b
         </div>
          <div className="space-y-2">
             {buttons.map(button => {
-                const primaryStyles = "bg-teal-600 hover:bg-teal-500 text-white font-bold";
+                const primaryStyles = "bg-blue-700 hover:bg-blue-600 text-white font-bold";
                 const secondaryStyles = "bg-[#3a3d46] hover:bg-[#4a4d56] border border-[#4f525c] text-gray-300 font-semibold";
                 const isDisabled = isExecuting;
                 

@@ -1,3 +1,6 @@
+
+
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { produce } from 'immer';
 import { nanoid } from 'nanoid';
@@ -28,7 +31,7 @@ import ConfirmationModal from './components/modals/ConfirmationModal';
 // Icons
 import { 
     PlayIcon, ChevronRightIcon, ArrowPathIcon, Cog6ToothIcon, 
-    StarIcon, UserCircleIcon, TerminalIcon, ExclamationCircleIcon, BookOpenIcon, StopIcon, PauseIcon
+    StarIcon, UserCircleIcon, TerminalIcon, ExclamationCircleIcon, BookOpenIcon, StopIcon, PauseIcon, CpuChipIcon
 } from './components/icons';
 import { getIconForShape } from './components/icons';
 
@@ -357,12 +360,12 @@ const App: React.FC = () => {
         setIsRunning(false);
         if (runnerTimeoutRef.current) clearTimeout(runnerTimeoutRef.current);
         
-        setLogs([`Compiling and running ${lang} code...`]);
+        setLogs([`Preparing to run ${lang} code...`]);
         setProblems([]); // Clear old problems
         setActiveOutputTabId('console');
 
         try {
-            const { steps, problems: compileProblems, logs: compileLogs } = await parseCode(runCode, fileSystem, lang, fileId, settings.pythonEngine);
+            const { steps, problems: compileProblems, logs: compileLogs } = await parseCode(runCode, fileSystem, lang, fileId, settings.pythonEngine, (logMessage) => setLogs(prev => [...prev, logMessage]));
             
             const problemsWithCodeContext = compileProblems.map(p => ({ ...p, code: runCode, language: lang }));
             setProblems(problemsWithCodeContext);
@@ -370,10 +373,10 @@ const App: React.FC = () => {
 
             if (compileProblems.length > 0) {
                 if (activeOutputTabId !== 'guide') setActiveOutputTabId('problems');
-                setLogs(prev => [...prev, 'Compilation failed. Cannot create replay.']);
+                setLogs(prev => [...prev, 'Execution failed. Cannot create replay.']);
                 executionStepsRef.current = []; // Clear steps on failure
             } else {
-                setLogs(prev => [...prev, 'Compilation successful. Replay is ready.']);
+                setLogs(prev => [...prev, 'Execution successful. Replay is ready.']);
                 executionStepsRef.current = steps;
             }
             
@@ -400,10 +403,10 @@ const App: React.FC = () => {
       if (isExecuting) return;
       const runnableTabs = openTabs
         .map(id => fileSystem[id])
-        .filter((node): node is Extract<FileSystemNode, {type: 'file'}> => !!node && node.type === 'file' && (node.name.endsWith('.js') || node.name.endsWith('.py')) && node.status !== 'deleted');
+        .filter((node): node is Extract<FileSystemNode, {type: 'file'}> => !!node && node.type === 'file' && (node.name.endsWith('.js') || node.name.endsWith('.jsx') || node.name.endsWith('.ts') || node.name.endsWith('.tsx') || node.name.endsWith('.py')) && node.status !== 'deleted');
 
       if (runnableTabs.length === 0) {
-          setLogs(prev => [...prev, 'No runnable files (.js, .py) are open.']);
+          setLogs(prev => [...prev, 'No runnable files (.js, .jsx, .ts, .tsx, .py) are open.']);
           return;
       }
       
@@ -654,7 +657,8 @@ const App: React.FC = () => {
 
 
   const primaryDisplayControls = [
-    { id: 'play', icon: isRunning ? <PauseIcon /> : (isExecuting ? <ArrowPathIcon className="animate-spin" /> : <PlayIcon />), onClick: handleToggleReplay, isPrimary: true, disabled: isExecuting || executionStepsRef.current.length === 0 },
+// FIX: Added w-6 h-6 to ArrowPathIcon to ensure it has a size and matches the other icons in this control group.
+    { id: 'play', icon: isRunning ? <PauseIcon /> : (isExecuting ? <ArrowPathIcon className="w-6 h-6 animate-spin" /> : <PlayIcon />), onClick: handleToggleReplay, isPrimary: true, disabled: isExecuting || executionStepsRef.current.length === 0 },
     { id: 'step', icon: <ChevronRightIcon />, onClick: handleStepForward, disabled: isExecuting || isRunning || currentStep >= executionStepsRef.current.length },
     { id: 'stop', icon: <StopIcon />, onClick: handleStopReplay, disabled: isExecuting || executionStepsRef.current.length === 0 },
   ];
@@ -676,7 +680,17 @@ const App: React.FC = () => {
 
   const editorActions = [ {id: 'settings', icon: <Cog6ToothIcon />, onClick: () => setSettingsOpen(true)} ];
   const currentUser = { name: 'Current User', avatar: <UserCircleIcon className="w-full h-full text-gray-500" />, status: 'ONLINE', rank: 'N/A', rankIcon: <StarIcon /> };
-  const actionButtons = [
+  
+// FIX: Defined a specific type for the action buttons to prevent TypeScript from widening the 'style' property to a generic 'string'.
+  type ActionButton = {
+    id: string;
+    text: string;
+    icon: React.ReactNode;
+    onClick: () => void;
+    style: 'primary' | 'secondary';
+  };
+
+  const actionButtons: ActionButton[] = [
     { id: 'primary', text: 'Run This File', icon: <PlayIcon />, onClick: handleRunCurrentFile, style: 'primary' },
     { id: 'secondary', text: 'Run All Open Files', icon: <PlayIcon />, onClick: handleRunAllOpenFiles, style: 'secondary' },
   ];
