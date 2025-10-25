@@ -19,10 +19,11 @@ interface EditorPanelProps {
     onNewFileClick: () => void;
     onTabsReorder: (tabs: string[]) => void;
     onAddProblem: (problem: Problem) => void;
+    onRunSelection: (selectedCode: string) => void;
 }
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({ 
-    actions, openTabs, activeTabId, fileSystem, problems, settings, onTabClick, onTabClose, onCodeChange, onNewFileClick, onTabsReorder, onAddProblem
+    actions, openTabs, activeTabId, fileSystem, problems, settings, onTabClick, onTabClose, onCodeChange, onNewFileClick, onTabsReorder, onAddProblem, onRunSelection
 }) => {
   const activeFile = fileSystem[activeTabId];
   const code = (activeFile?.type === 'file' ? activeFile.code : '') || '';
@@ -198,6 +199,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
               settings={settings}
               onCursorChange={setCursorPosition}
               onOpenPalette={() => setPaletteOpen(true)}
+              onRunSelection={onRunSelection}
             />
         ) : (
             <div className="absolute inset-0 flex items-center justify-center text-gray-500">

@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { produce } from 'immer';
 import { nanoid } from 'nanoid';
@@ -400,6 +396,11 @@ const App: React.FC = () => {
     handleRun(activeFile.code, activeLanguage, activeTabId);
   };
 
+  const handleRunSelection = (selectedCode: string) => {
+    if (activeFile?.type !== 'file' || isExecuting || activeFile?.status === 'deleted') return;
+    handleRun(selectedCode, activeLanguage, activeTabId);
+  };
+
   const handleRunAllOpenFiles = () => {
       if (isExecuting) return;
       const runnableTabs = openTabs
@@ -730,6 +731,7 @@ const App: React.FC = () => {
         onCodeChange={updateCode}
         onNewFileClick={() => handleNewItem('file', 'root')}
         onAddProblem={handleAddProblem}
+        onRunSelection={handleRunSelection}
       />,
       TabbedOutputPanel: <div className="flex-shrink-0 h-[250px]"><TabbedOutputPanel 
         tabs={ideToolTabs} 

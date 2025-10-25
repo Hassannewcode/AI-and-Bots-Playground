@@ -32,6 +32,7 @@ interface CodeEditorProps {
   settings: Settings;
   onCursorChange: (position: { line: number, column: number }) => void;
   onOpenPalette: () => void;
+  onRunSelection: (selectedCode: string) => void;
 }
 
 const mapLanguageToMonaco = (lang: string): string => {
@@ -84,7 +85,7 @@ const mapSuggestionTypeToMonacoKind = (type: string) => {
     }
 };
 
-const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, problems, settings, onCursorChange, onOpenPalette }) => {
+const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, problems, settings, onCursorChange, onOpenPalette, onRunSelection }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<any>(null);
     const completionProviderRef = useRef<any>(null);
@@ -97,6 +98,13 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, p
     const monacoRef = useRef<any>(null);
     const [initialCode] = useState<string>(code);
     const decorationsRef = useRef<string[]>([]);
+    
+    // Use a ref to store the latest onRunSelection callback to avoid stale closures.
+    const onRunSelectionRef = useRef(onRunSelection);
+    useEffect(() => {
+        onRunSelectionRef.current = onRunSelection;
+    }, [onRunSelection]);
+
 
     // Effect to initialize the editor instance. Runs only once.
     useEffect(() => {
@@ -155,6 +163,21 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, onCodeChange, language, p
                     keybindings: [monaco.KeyCode.F1],
                     run: () => {
                         onOpenPalette();
+                    }
+                });
+
+                editorInstance.addAction({
+                    id: 'run-selection',
+                    label: 'Run Selected Code',
+                    precondition: 'editorHasSelection',
+                    contextMenuGroupId: 'navigation',
+                    contextMenuOrder: 1.5,
+                    run: (editor: any) => {
+                        const selection = editor.getSelection();
+                        if (selection && !selection.isEmpty()) {
+                            const selectedCode = editor.getModel().getValueInRange(selection);
+                            onRunSelectionRef.current(selectedCode);
+                        }
                     }
                 });
 
