@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { Problem } from '../../game/types';
 import { getFixForCodeError } from '../../game/gemini';
 import { LanguageGuide } from '../guides/LanguageGuide';
-import { ArrowPathIcon, CheckIcon, XMarkIcon } from '../icons';
+import { ArrowPathIcon, CheckIcon, XMarkIcon, SparklesIcon } from '../icons';
 
 
 interface TabbedOutputPanelProps {
@@ -67,10 +67,10 @@ const AIFixComponent: React.FC<{ problem: Problem, onApplyFix: (fileId: string, 
                 <button
                     onClick={handleGetFix}
                     disabled={isLoading}
-                    className="px-2 py-0.5 text-xs bg-sky-800 hover:bg-sky-700 text-sky-200 rounded-md flex items-center"
+                    className="px-2 py-0.5 text-xs bg-sky-800 hover:bg-sky-700 text-sky-200 rounded-md flex items-center space-x-1"
                 >
-                    {isLoading ? <ArrowPathIcon className="w-4 h-4 animate-spin mr-1" /> : null}
-                    {isLoading ? 'Thinking...' : '✨ Get AI Fix'}
+                    {isLoading ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <SparklesIcon className="w-4 h-4" />}
+                    <span>{isLoading ? 'Thinking...' : 'Get AI Fix'}</span>
                 </button>
             )}
              {error && <div className="ml-4 text-xs text-amber-500">{error}</div>}
