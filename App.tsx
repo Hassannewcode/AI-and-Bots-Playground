@@ -41,21 +41,62 @@ const initialFiles: FileSystemTree = {
     type: 'file', 
     parentId: 'root',
     code: [
-      '# Welcome to the Universal Playground!',
-      '# Your world is now defined in world.html!',
-      '# You can install packages in the console with `pip install <package_name>`',
-      '',
-      '# Create a sprite and give it a brain',
-      'bot = ai.Sprite(name="PythonBot", shape="user", x=10, y=85)',
-      'bot.create_network()',
-      '',
-      '# Make it move and talk',
-      'bot.go_to(x=80, y=20)',
-      'sound.play(x=bot.x, y=bot.y)',
-      'bot.say(message="Real Python in control!")',
-      'bot.reward(value=1) # Give a positive reward!',
-      '',
-      'print(f"Python bot {bot.name} is ready!")'
+        '# Welcome to the Universal Playground!',
+        '# This example runs a bouncing ball simulation using standard Python.',
+        'import random',
+        '',
+        'class Ball:',
+        '    def __init__(self, x, y, radius=4.0):',
+        '        self.x = x',
+        '        self.y = y',
+        '        self.vx = random.uniform(-2.0, 2.0)',
+        '        self.vy = random.uniform(-1.0, 1.0)',
+        '        self.r = radius',
+        '        self.elasticity = 0.8',
+        '        self.gravity = 0.1',
+        '',
+        '    def update(self, bounds=(100, 100)):',
+        '        """Update position and velocity."""',
+        '        w, h = bounds',
+        '',
+        '        # Apply gravity',
+        '        self.vy += self.gravity',
+        '',
+        '        # Integrate motion',
+        '        self.x += self.vx',
+        '        self.y += self.vy',
+        '',
+        '        # Handle bounces',
+        '        if self.x > w - self.r or self.x < self.r:',
+        '            self.vx *= -self.elasticity',
+        '            self.x = max(self.r, min(self.x, w - self.r))',
+        '',
+        '        if self.y > h - self.r or self.y < self.r:',
+        '            self.vy *= -self.elasticity',
+        '            self.y = max(self.r, min(self.y, h - self.r))',
+        '',
+        '# --- Main Script ---',
+        '',
+        '# 1. Create physics models for 5 balls',
+        'balls = [Ball(x=random.uniform(10, 90), y=random.uniform(10, 50)) for _ in range(5)]',
+        '',
+        '# 2. Create a visual sprite for each ball model',
+        'sprites = [ai.Sprite(name=f"ball_{i}", shape="smiley", x=ball.x, y=ball.y) for i, ball in enumerate(balls)]',
+        '',
+        '# 3. Run the simulation loop',
+        'print("Starting bouncing ball simulation...")',
+        'for frame in range(400):',
+        '    for i, ball in enumerate(balls):',
+        '        # Update the physics model in memory',
+        '        ball.update()',
+        '        # Move the visual sprite to match the physics model',
+        '        # speed=0.05 makes the animation smoother by taking 50ms per step',
+        '        sprites[i].move_to(x=ball.x, y=ball.y, speed=0.05)',
+        '    ',
+        '    # Wait for all moves in this frame to finish before starting the next one',
+        '    ai.wait(0.05)',
+        '',
+        'print("Simulation finished!")'
     ].join('\n')
   },
   'readme_md': {
@@ -70,11 +111,11 @@ const initialFiles: FileSystemTree = {
         '',
         '## Key Features',
         '',
+        '*   **Full Python & JS Support**: The engine runs real, sandboxed Python and JavaScript. You can use classes, imports, loops, and modern language features. Check out `main.py` for a bouncing ball example!',
         '*   **Declarative Worlds**: Define your static props (walls, rocks) in `world.html`. The engine parses this file automatically when you run your code.',
         '*   **AI Error Fixes**: When your code fails, an error appears in the **Problems** tab. Click the ✨ button to get an AI-powered explanation and a suggested fix from Gemini.',
         '*   **Integrated Sprite AI**: The `neurons` library has been merged into sprites. You can now call `your_sprite.create_network()` and `your_sprite.reward()` directly.',
-        '*   **Real Execution**: Your Python and JavaScript code run in real, sandboxed environments. Other languages are for syntax highlighting only.',
-        '*   **Package Management**: Install Python packages from PyPI directly from the console using `pip install <package_name>`.',
+        '*   **Package Management**: Install Python packages from PyPI directly from the console using `pip install <package_name>`. The system will automatically substitute packages like `pygame` with browser-compatible versions like `pygame-ce`.',
         '',
         '## How to Run',
         '',
@@ -93,8 +134,12 @@ const initialFiles: FileSystemTree = {
         '<!-- The engine will parse these elements when you run your code. -->',
         '<!-- Use `data-shape` for the type and inline styles for position/size. -->',
         '',
+        '<!-- Bouncing Box -->',
+        '<div class="prop" data-shape="wall" style="left: 50%; top: 2%; width: 100%; height: 4%; background-color: #475569;"></div>',
         '<div class="prop" data-shape="wall" style="left: 50%; top: 98%; width: 100%; height: 4%; background-color: #475569;"></div>',
+        '<div class="prop" data-shape="wall" style="left: 2%; top: 50%; width: 4%; height: 100%; background-color: #475569;"></div>',
         '<div class="prop" data-shape="wall" style="left: 98%; top: 50%; width: 4%; height: 100%; background-color: #475569;"></div>',
+        '',
         '<div class="prop" data-shape="rock" style="left: 70%; top: 60%; width: 10%; height: 15%; background-color: #64748b;"></div>',
     ].join('\n')
   }
@@ -371,7 +416,7 @@ const App: React.FC = () => {
             }
         });
         setGameState(previewState);
-        setLogs(['Replay is ready. Press play to start.']);
+        setLogs(prev => [...prev, 'Replay is ready. Press play to start.']);
     }, []);
 
     const handleRun = async (runCode: string, lang: string, fileId: string) => {
@@ -380,7 +425,8 @@ const App: React.FC = () => {
         setIsRunning(false);
         if (runnerTimeoutRef.current) clearTimeout(runnerTimeoutRef.current);
         
-        setLogs([`Preparing to run ${lang} code...`]);
+        const startTime = new Date().toLocaleTimeString('en-US', { hour12: false });
+        setLogs(prev => [...prev, `--- [Run @ ${startTime}] ---`, `Preparing to run ${lang} code...`]);
         setProblems([]); // Clear old problems
         setActiveOutputTabId('console');
 
@@ -768,13 +814,18 @@ const App: React.FC = () => {
         } catch (e) {
             const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
             setLogs(prev => [...prev, `Error installing packages: ${errorMessage}`]);
-            setProblems(prev => [...prev, { fileId: activeTabId, line: 0, message: `Package Installation Error: ${errorMessage}`, code: '', language: 'txt' }]);
+            // Monaco line numbers are 1-based. Using 0 causes a crash.
+            setProblems(prev => [...prev, { fileId: activeTabId, line: 1, message: `Package Installation Error: ${errorMessage}`, code: '', language: 'txt' }]);
             if (activeOutputTabId !== 'guide') setActiveOutputTabId('problems');
         }
     } else {
         setLogs(prev => [...prev, `Command not found: ${commandName}`]);
     }
   };
+
+  const handleClearLogs = useCallback(() => {
+    setLogs(['Console cleared.']);
+  }, []);
 
 
   const primaryDisplayControls = [
@@ -867,6 +918,7 @@ const App: React.FC = () => {
         onApplyFix={handleApplyCodeFix}
         onReplaceFileContent={handleReplaceFileContent}
         onRunCommand={handleRunCommand}
+        onClearLogs={handleClearLogs}
       /></div>,
       PrimaryDisplayPanel: <PrimaryDisplayPanel 
         controls={primaryDisplayControls} 

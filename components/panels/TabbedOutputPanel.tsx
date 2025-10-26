@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { Problem, FileSystemTree } from '../../game/types';
 import { getFixForCodeError, getFixForAllCodeErrors } from '../../game/gemini';
 import { LanguageGuide } from '../guides/LanguageGuide';
-import { ArrowPathIcon, CheckIcon, XMarkIcon, SparklesIcon } from '../icons';
+import { ArrowPathIcon, CheckIcon, XMarkIcon, SparklesIcon, TrashIcon } from '../icons';
 
 
 interface TabbedOutputPanelProps {
@@ -17,6 +17,7 @@ interface TabbedOutputPanelProps {
     onApplyFix: (fileId: string, startLine: number, endLine: number, newCode: string) => void;
     onReplaceFileContent: (fileId: string, newCode: string) => void;
     onRunCommand: (command: string) => void;
+    onClearLogs: () => void;
 }
 
 const AIFixComponent: React.FC<{ problem: Problem, onApplyFix: (fileId: string, startLine: number, endLine: number, newCode: string) => void }> = ({ problem, onApplyFix }) => {
@@ -84,7 +85,7 @@ const AIFixComponent: React.FC<{ problem: Problem, onApplyFix: (fileId: string, 
 }
 
 export const TabbedOutputPanel: React.FC<TabbedOutputPanelProps> = ({ 
-    tabs, onTabClick, activeTabId, logs, problems, activeLanguage, fileSystem, activeFileId, onApplyFix, onReplaceFileContent, onRunCommand
+    tabs, onTabClick, activeTabId, logs, problems, activeLanguage, fileSystem, activeFileId, onApplyFix, onReplaceFileContent, onRunCommand, onClearLogs
 }) => {
     const [isFixingAll, setIsFixingAll] = useState(false);
     const [fixAllError, setFixAllError] = useState('');
@@ -149,8 +150,8 @@ export const TabbedOutputPanel: React.FC<TabbedOutputPanelProps> = ({
                     <div className="h-full flex flex-col">
                         <div ref={consoleLogContainerRef} className="flex-grow p-2 overflow-y-auto">
                             {logs.map((log, index) => (
-                                <div key={index} className="whitespace-pre-wrap break-words break-all">
-                                    {log.startsWith('>') ? '' : '> '}{log}
+                                <div key={index} className={`whitespace-pre-wrap break-words break-all ${log.startsWith('---') ? 'text-gray-500' : ''}`}>
+                                    {log.startsWith('>') || log.startsWith('---') ? '' : '> '}{log}
                                 </div>
                             ))}
                         </div>
@@ -223,19 +224,28 @@ export const TabbedOutputPanel: React.FC<TabbedOutputPanelProps> = ({
 
     return (
         <div className="h-full bg-[#272a33] rounded-lg flex flex-col min-h-0 border border-[#3a3d46]">
-            <div className="flex border-b border-[#3a3d46] text-gray-400 flex-shrink-0">
-            {tabs.map(tab => (
-                <button 
-                    key={tab.id} 
-                    onClick={() => onTabClick(tab.id)} 
-                    title={tab.title}
-                    className={`px-3 py-2 text-xs font-semibold flex items-center space-x-2 hover:text-white transition-colors ${activeTabId === tab.id ? 'bg-[#1e2026] text-white' : ''}`}
-                >
-                    {tab.icon}
-                    <span>{tab.title}</span>
-                    {tab.count !== undefined && tab.count > 0 && <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">{tab.count}</span>}
-                </button>
-            ))}
+            <div className="flex justify-between items-center border-b border-[#3a3d46] text-gray-400 flex-shrink-0">
+                <div className="flex">
+                {tabs.map(tab => (
+                    <button 
+                        key={tab.id} 
+                        onClick={() => onTabClick(tab.id)} 
+                        title={tab.title}
+                        className={`px-3 py-2 text-xs font-semibold flex items-center space-x-2 hover:text-white transition-colors ${activeTabId === tab.id ? 'bg-[#1e2026] text-white' : ''}`}
+                    >
+                        {tab.icon}
+                        <span>{tab.title}</span>
+                        {tab.count !== undefined && tab.count > 0 && <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">{tab.count}</span>}
+                    </button>
+                ))}
+                </div>
+                 {activeTabId === 'console' && (
+                    <div className="pr-2">
+                        <button onClick={onClearLogs} title="Clear Console Logs" className="p-1 rounded-md hover:bg-[#3a3d46] text-gray-500 hover:text-white transition-colors">
+                            <TrashIcon className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
             </div>
             <div className="flex-grow bg-[#1e2026] font-mono text-xs text-gray-400 overflow-hidden">
                 {renderContent()}

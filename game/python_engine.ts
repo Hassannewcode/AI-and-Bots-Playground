@@ -4,6 +4,15 @@ import { nanoid } from 'nanoid';
 let pyodideDirectPromise: Promise<any> | null = null;
 let pyodideViaPyScriptPromise: Promise<any> | null = null;
 
+// A map for common package substitutions for web compatibility.
+const packageSubstitutions: Record<string, string> = {
+    'pygame': 'pygame-ce',
+    'cv2': 'opencv-python',
+    'opencv': 'opencv-python',
+    'sklearn': 'scikit-learn'
+};
+
+
 function loadScript(url: string, id: string, type?: string): Promise<void> {
     return new Promise((resolve, reject) => {
         if (document.getElementById(id)) {
@@ -97,9 +106,17 @@ export async function installPythonPackage(
         logCallback("Loading micropip...");
         await pyodide.loadPackage("micropip");
         const micropip = pyodide.pyimport("micropip");
+        
+        const processedPackages = packages.map(p => packageSubstitutions[p.toLowerCase()] || p);
+        const hasSubstitutions = packages.some((p, i) => p !== processedPackages[i]);
 
-        logCallback(`Installing ${packages.join(', ')}... (This may take a while)`);
-        await micropip.install(packages);
+        if (hasSubstitutions) {
+            logCallback(`(Note: Substituted packages for browser compatibility, e.g., 'pygame' -> 'pygame-ce')`);
+        }
+
+        logCallback(`Installing ${processedPackages.join(', ')}... (This may take a while)`);
+        await micropip.install(processedPackages);
+
     } catch (e: any) {
         console.error("Error installing Python package:", e);
         throw new Error(e.message || "An unknown error occurred during package installation.");
