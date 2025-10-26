@@ -1,6 +1,3 @@
-
-
-
 import React from 'react';
 import { QuestionMarkCircleIcon, ArrowPathIcon } from '../icons';
 
@@ -28,6 +25,7 @@ export const ActionButtonsPanel: React.FC<ActionButtonsPanelProps> = ({ title, b
                         key={button.id} 
                         onClick={button.onClick} 
                         disabled={isDisabled}
+                        title={button.text}
                         className={`w-full h-10 rounded-md flex items-center justify-center space-x-2 transition-colors text-xs ${button.style === 'primary' ? primaryStyles : secondaryStyles} disabled:bg-gray-600 disabled:cursor-not-allowed`}
                     >
                         {isExecuting ? <ArrowPathIcon className="animate-spin w-5 h-5" /> : button.icon}

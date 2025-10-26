@@ -1,5 +1,3 @@
-
-
 import React, { useState, useRef, useEffect } from 'react';
 import type { FileSystemTree, FileSystemNode } from '../../game/types';
 import { produce } from 'immer';
@@ -123,6 +121,15 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
     const isFolder = node.type === 'folder';
     const isDeleted = node.status === 'deleted';
 
+    let titleText = '';
+    if (isDeleted) {
+        titleText = 'Click to restore';
+    } else if (isFolder) {
+        titleText = 'Click to expand/collapse. Double-click to rename.';
+    } else { // isFile
+        titleText = 'Click to open. Double-click to rename.';
+    }
+
     let countdownText = '';
     if (isDeleted && node.deletionTime) {
         const DELETION_PERIOD = 3 * 60 * 60 * 1000; // 3 hours
@@ -144,6 +151,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
                 }}
                 onContextMenu={(e) => onContextMenu(e, node)}
                 onDoubleClick={() => !isDeleted && setIsRenaming(true)}
+                title={titleText}
             >
                 {isFolder ? (
                     isOpen ? <ChevronDownIcon /> : <ChevronRightIcon />

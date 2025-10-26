@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { produce } from 'immer';
 import type { PanelLayout, PanelComponentKey } from '../../game/types';
@@ -104,6 +103,7 @@ const LayoutCustomizer: React.FC<LayoutCustomizerProps> = ({ initialLayout, onSa
                                             draggable
                                             onDragStart={() => handleDragStart(panelKey, columnKey, index)}
                                             onDragEnter={(e) => handleDragEnter(e, columnKey, index)}
+                                            title="Drag to move this panel"
                                             className={`p-3 bg-[#1e2026] rounded border border-gray-700 cursor-grab mb-2 transition-opacity ${isBeingDragged ? 'opacity-30' : 'hover:border-gray-500'}`}
                                         >
                                             <h4 className="font-bold text-white text-sm">{details.title}</h4>

@@ -27,7 +27,7 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({ language, curs
     return (
         <div className="h-6 bg-[#1e2026] flex items-center justify-end px-4 text-xs text-gray-400 font-sans space-x-6 flex-shrink-0 border-t border-[#3a3d46]">
             <span>Ln {cursorPosition.line}, Col {cursorPosition.column}</span>
-            <button className="hover:text-white transition-colors">{langName}</button>
+            <button title="Change language mode" className="hover:text-white transition-colors">{langName}</button>
         </div>
     );
 };

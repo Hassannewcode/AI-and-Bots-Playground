@@ -187,14 +187,15 @@ const KeybindingInput: React.FC<{ label: string, value: string, onChange: (value
                 <button
                     type="button"
                     onClick={handleMainClick}
+                    title="Click to set a new keybinding"
                     className="w-48 bg-[#1e2026] border border-[#3a3d46] rounded-md px-2 py-1 text-white text-center font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[34px]"
                 >
                     {isListening ? (keys.size > 0 ? formatKeys(keys) : 'Press keys...') : value}
                 </button>
                 {isListening && (
                     <>
-                        <button onClick={handleSet} className="px-3 py-1 text-xs font-semibold text-white bg-green-700 hover:bg-green-600 rounded-md transition-colors">Set</button>
-                        <button onClick={() => setIsListening(false)} className="px-3 py-1 text-xs font-semibold text-gray-300 bg-gray-600 hover:bg-gray-500 rounded-md transition-colors">Cancel</button>
+                        <button onClick={handleSet} title="Confirm this keybinding" className="px-3 py-1 text-xs font-semibold text-white bg-green-700 hover:bg-green-600 rounded-md transition-colors">Set</button>
+                        <button onClick={() => setIsListening(false)} title="Cancel changing this keybinding" className="px-3 py-1 text-xs font-semibold text-gray-300 bg-gray-600 hover:bg-gray-500 rounded-md transition-colors">Cancel</button>
                     </>
                 )}
             </div>
@@ -240,18 +241,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, settings, setSet
                 <div className="flex border-b border-[#3a3d46] text-sm font-semibold">
                     <button 
                         onClick={() => setActiveTab('layout')}
+                        title="Switch to Layout settings"
                         className={`px-4 py-2 transition-colors ${activeTab === 'layout' ? 'text-white border-b-2 border-blue-500' : 'text-gray-400 hover:text-white'}`}
                     >
                         Layout
                     </button>
                     <button 
                         onClick={() => setActiveTab('keybindings')}
+                        title="Switch to Keybindings settings"
                         className={`px-4 py-2 transition-colors ${activeTab === 'keybindings' ? 'text-white border-b-2 border-blue-500' : 'text-gray-400 hover:text-white'}`}
                     >
                         Keybindings
                     </button>
                     <button
                         onClick={() => setActiveTab('runtimes')}
+                        title="Switch to Runtimes settings"
                         className={`px-4 py-2 transition-colors ${activeTab === 'runtimes' ? 'text-white border-b-2 border-blue-500' : 'text-gray-400 hover:text-white'}`}
                     >
                         Runtimes
@@ -329,6 +333,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, settings, setSet
                                     <div className="pl-8 mt-2">
                                         <button 
                                             onClick={onCustomizeLayout}
+                                            title="Open the drag-and-drop layout customizer"
                                             className="text-sm bg-blue-700 hover:bg-blue-600 text-white font-semibold py-1 px-3 rounded-md transition-colors"
                                         >
                                             Customize Layout...

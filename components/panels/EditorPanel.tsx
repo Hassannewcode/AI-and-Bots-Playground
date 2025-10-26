@@ -157,12 +157,14 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                           onDragEnd={handleDragEnd}
                           onDragOver={(e) => handleDragOverTab(e, tabId)}
                           onClick={() => onTabClick(tabId)}
+                          title={file.name}
                           className={`flex items-center px-3 border-r border-[#3a3d46] cursor-pointer hover:bg-[#22252a] transition-opacity ${isActive ? 'bg-[#1e2026] text-white' : ''} ${draggedTabId === tabId ? 'opacity-50' : ''}`}
                       >
                           <FileIcon className="w-4 h-4 mr-2 text-gray-500" />
                           <span className="text-xs font-semibold">{file.name}</span>
                           <button 
                               onClick={(e) => { e.stopPropagation(); onTabClose(tabId); }}
+                              title="Close tab"
                               className="ml-3 text-gray-500 hover:text-white rounded-full hover:bg-gray-600 p-0.5"
                           >
                               <XMarkIcon className="w-3 h-3" />
@@ -182,7 +184,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         </div>
         <div className="flex items-center space-x-3 px-3 text-gray-400">
             {actions.map(action => (
-                <button key={action.id} onClick={action.onClick} className="hover:text-white">{action.icon}</button>
+                <button key={action.id} onClick={action.onClick} title="Settings" className="hover:text-white">{action.icon}</button>
             ))}
         </div>
       </div>

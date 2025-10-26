@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 
 interface UserDetailsPanelProps {
@@ -26,7 +24,7 @@ export const UserDetailsPanel: React.FC<UserDetailsPanelProps> = ({ user, onDele
             {user.rankIcon}
             <span className="ml-1">{user.rank}</span>
           </div>
-          <button onClick={onDeleteClick} className="text-xs text-gray-500 hover:text-red-500 mt-1">DELETE</button>
+          <button onClick={onDeleteClick} title="Delete this user account" className="text-xs text-gray-500 hover:text-red-500 mt-1">DELETE</button>
       </div>
   </div>
 );
