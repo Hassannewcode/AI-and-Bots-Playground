@@ -215,10 +215,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         e.preventDefault();
         const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
         const isRightHalf = e.clientX > rect.left + rect.width / 2;
-        // Fix: Changed `const ... as const` to a mutable object with an explicit type.
+        
         const newTarget: { type: 'tab' | 'group' | 'bar', id?: string, position: 'before' | 'after' | 'over' } = { type, id, position: isRightHalf ? 'after' : 'before' };
         
-        if(draggedItem.current?.type === 'tab' && type === 'group') {
+        // Only allow 'over' position when dragging a TAB onto a GROUP
+        if (draggedItem.current?.type === 'tab' && type === 'group') {
              newTarget.position = 'over';
         }
         
@@ -229,46 +230,90 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
     };
 
     const handleDragEnd = () => {
-        if(draggedItem.current) {
-            setOpenTabs(produce(draft => {
-                if (!draggedItem.current || !dropTarget.current) return;
-                const { type: draggedType, id: draggedId, sourceGroupId } = draggedItem.current;
-                const { type: targetType, id: targetId, position } = dropTarget.current;
-
-                let draggedItemData: TabBarItem | undefined;
-
-                // Remove from source
-                if (sourceGroupId) {
-                    const sourceGroup = draft.find(g => typeof g !== 'string' && g.id === sourceGroupId) as TabGroup | undefined;
-                    if (sourceGroup) {
-                        const index = sourceGroup.children.indexOf(draggedId);
-                        if(index > -1) [draggedItemData] = sourceGroup.children.splice(index, 1);
-                        if(sourceGroup.children.length === 0) {
-                            const groupIndex = draft.findIndex(g => typeof g !== 'string' && g.id === sourceGroupId);
-                            if(groupIndex > -1) draft.splice(groupIndex, 1);
-                        }
-                    }
-                } else {
-                    const index = draft.findIndex(item => (typeof item === 'string' ? item : item.id) === draggedId);
-                    if(index > -1) [draggedItemData] = draft.splice(index, 1);
-                }
-                
-                if (!draggedItemData) return;
-
-                // Add to destination
-                if(targetType === 'group' && position === 'over' && typeof draggedItemData === 'string') {
-                    const targetGroup = draft.find(g => typeof g !== 'string' && g.id === targetId) as TabGroup | undefined;
-                    targetGroup?.children.push(draggedItemData);
-                } else {
-                    const targetIndex = draft.findIndex(item => (typeof item === 'string' ? item : item.id) === targetId);
-                    if (targetIndex > -1) {
-                        draft.splice(targetIndex + (position === 'after' ? 1 : 0), 0, draggedItemData);
-                    } else { // Dropped on bar
-                        draft.push(draggedItemData);
-                    }
-                }
-            }));
+        if (!draggedItem.current || !dropTarget.current) {
+            draggedItem.current = null;
+            dropTarget.current = null;
+            setForceRerender(p => p + 1);
+            return;
         }
+    
+        setOpenTabs(produce(draft => {
+            const { id: draggedId, sourceGroupId } = draggedItem.current!;
+            const { type: targetType, id: targetId, position } = dropTarget.current!;
+    
+            // 1. Find and remove the dragged item from its original position.
+            let draggedItemData: TabBarItem | undefined;
+            
+            if (sourceGroupId) { // Item was in a group
+                const sourceGroup = draft.find(g => typeof g !== 'string' && g.id === sourceGroupId) as TabGroup | undefined;
+                if (sourceGroup) {
+                    const index = sourceGroup.children.indexOf(draggedId);
+                    if (index > -1) [draggedItemData] = sourceGroup.children.splice(index, 1);
+                    if (sourceGroup.children.length === 0) {
+                        const groupIndex = draft.findIndex(g => typeof g !== 'string' && g.id === sourceGroupId);
+                        if (groupIndex > -1) draft.splice(groupIndex, 1);
+                    }
+                }
+            } else { // Item was top-level
+                const index = draft.findIndex(item => (typeof item === 'string' ? item : item.id) === draggedId);
+                if (index > -1) [draggedItemData] = draft.splice(index, 1);
+            }
+    
+            if (!draggedItemData) return;
+    
+            // 2. Insert the dragged item into its new position.
+    
+            // Case A: Dropping a TAB INTO a group.
+            if (typeof draggedItemData === 'string' && targetType === 'group' && position === 'over') {
+                const targetGroup = draft.find(g => typeof g !== 'string' && g.id === targetId) as TabGroup | undefined;
+                if (targetGroup && targetGroup.children.indexOf(draggedItemData) === -1) {
+                    targetGroup.children.push(draggedItemData);
+                } else {
+                    draft.push(draggedItemData); // Failsafe
+                }
+                return;
+            }
+    
+            // Case B: Find drop target's location (top-level or nested).
+            let targetTopLevelIndex = -1;
+            let targetNestedInfo: { group: TabGroup; childIndex: number } | null = null;
+    
+            if (targetId) {
+                for (let i = 0; i < draft.length; i++) {
+                    const item = draft[i];
+                    if (typeof item === 'string') {
+                        if (item === targetId) { targetTopLevelIndex = i; break; }
+                    } else { // It's a group
+                        if (item.id === targetId && targetType === 'group') { targetTopLevelIndex = i; break; }
+                        const childIndex = item.children.indexOf(targetId);
+                        if (childIndex !== -1) { targetNestedInfo = { group: item as TabGroup, childIndex }; break; }
+                    }
+                }
+            }
+    
+            // B.1. Dropped next to a nested tab
+            if (targetNestedInfo) {
+                if (typeof draggedItemData === 'string') {
+                    const { group, childIndex } = targetNestedInfo;
+                    const insertIndex = childIndex + (position === 'after' ? 1 : 0);
+                    group.children.splice(insertIndex, 0, draggedItemData);
+                } else {
+                    const parentGroupIndex = draft.findIndex(g => typeof g !== 'string' && g.id === targetNestedInfo.group.id);
+                    draft.splice(parentGroupIndex + (position === 'after' ? 1 : 0), 0, draggedItemData);
+                }
+            } 
+            // B.2. Dropped next to a top-level item
+            else if (targetTopLevelIndex !== -1) {
+                const insertIndex = targetTopLevelIndex + (position === 'after' ? 1 : 0);
+                draft.splice(insertIndex, 0, draggedItemData);
+            } 
+            // B.3. Dropped in an empty area of the tab bar
+            else {
+                draft.push(draggedItemData);
+            }
+        }));
+    
+        // Final cleanup
         draggedItem.current = null;
         dropTarget.current = null;
         setForceRerender(p => p + 1);
