@@ -1,9 +1,9 @@
-import type { FileSystemTree, Problem, FileSystemNode } from '../game/types';
+import type { FileSystemTree, Problem, FileSystemNode, TabBarItem } from '../game/types';
 import type { ContextPackage } from './types';
 
 interface AppState {
     fileSystem: FileSystemTree;
-    openTabs: string[];
+    openTabs: TabBarItem[];
     activeTabId: string;
     logs: string[];
     problems: Problem[];
@@ -26,8 +26,10 @@ export async function buildContextPackage(appState: AppState): Promise<ContextPa
 
     const activeFile = fileSystem[activeTabId];
     const activeEditorContent = activeFile?.type === 'file' ? activeFile.code : null;
+    
+    const allOpenTabIds = openTabs.flatMap(item => typeof item === 'string' ? item : item.children);
 
-    const allOpenFilesContent = openTabs
+    const allOpenFilesContent = allOpenTabIds
         .map(id => fileSystem[id])
         .filter((node): node is FileSystemNode & { type: 'file' } => !!node && node.type === 'file' && node.status !== 'deleted')
         .map(file => ({ name: file.name, content: file.code }));
@@ -49,7 +51,7 @@ export async function buildContextPackage(appState: AppState): Promise<ContextPa
 
     return {
         fileSystem,
-        openTabIds: openTabs,
+        openTabIds: allOpenTabIds,
         activeTabId,
         activeEditorContent,
         allOpenFilesContent,

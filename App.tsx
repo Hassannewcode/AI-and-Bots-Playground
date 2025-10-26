@@ -5,7 +5,7 @@ import { GoogleGenAI, Type, FunctionDeclaration, Content, FunctionCall, Part } f
 
 import { parseCode } from './game/engine';
 import { getGeminiResponse, getAiThought } from './game/gemini';
-import type { GameState, Problem, ExecutionStep, FileSystemTree, FileSystemNode, PanelLayout, PanelComponentKey } from './game/types';
+import type { GameState, Problem, ExecutionStep, FileSystemTree, FileSystemNode, PanelLayout, PanelComponentKey, TabBarItem, TabGroup } from './game/types';
 import type { AIStateStatus } from './ai/types';
 import { runAssistantTurn } from './ai/assistant';
 import { toggleFullscreen, shareCode } from './controls/gameControls';
@@ -110,6 +110,24 @@ const initialGameState: GameState = {
 
 const DELETION_PERIOD_MS = 3 * 60 * 60 * 1000; // 3 hours
 
+// Helper to find a tab and its location
+const findTabAndLocation = (tabs: TabBarItem[], tabId: string) => {
+    for (let i = 0; i < tabs.length; i++) {
+        const item = tabs[i];
+        if (typeof item === 'string') {
+            if (item === tabId) {
+                return { topLevelIndex: i, childIndex: -1, group: null };
+            }
+        } else { // It's a group
+            const childIndex = item.children.indexOf(tabId);
+            if (childIndex !== -1) {
+                return { topLevelIndex: i, childIndex: childIndex, group: item };
+            }
+        }
+    }
+    return null;
+};
+
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>(initialGameState);
   const [logs, setLogs] = useState<string[]>(['Welcome! Your environment will build live as you code.']);
@@ -117,7 +135,9 @@ const App: React.FC = () => {
   const [activeOutputTabId, setActiveOutputTabId] = useState('console');
 
   const [fileSystem, setFileSystem] = useState<FileSystemTree>(initialFiles);
-  const [openTabs, setOpenTabs] = useState<string[]>(['main_py', 'world_html', 'readme_md']);
+  const [openTabs, setOpenTabs] = useState<TabBarItem[]>([
+     { id: nanoid(8), name: 'Project Files', color: '#3b82f6', isCollapsed: false, children: ['main_py', 'world_html', 'readme_md'] }
+  ]);
   const [activeTabId, setActiveTabId] = useState<string>('main_py');
 
   const executionStepsRef = useRef<ExecutionStep[]>([]);
@@ -403,7 +423,9 @@ const App: React.FC = () => {
 
   const handleRunAllOpenFiles = () => {
       if (isExecuting) return;
-      const runnableTabs = openTabs
+      const allOpenIds = openTabs.flatMap(item => typeof item === 'string' ? item : item.children);
+
+      const runnableTabs = allOpenIds
         .map(id => fileSystem[id])
         .filter((node): node is Extract<FileSystemNode, {type: 'file'}> => !!node && node.type === 'file' && (node.name.endsWith('.js') || node.name.endsWith('.jsx') || node.name.endsWith('.ts') || node.name.endsWith('.tsx') || node.name.endsWith('.py')) && node.status !== 'deleted');
 
@@ -489,6 +511,17 @@ const App: React.FC = () => {
     setProblems(prev => prev.filter(p => !(p.fileId === fileId && p.line >= startLine && p.line <= endLine)));
   };
   
+  const handleReplaceFileContent = (fileId: string, newCode: string) => {
+    setFileSystem(produce(draft => {
+        const file = draft[fileId] as Extract<FileSystemNode, {type: 'file'}>;
+        if (file) {
+            file.code = newCode;
+        }
+    }));
+    // Clear all problems for that file since we just tried to fix them all.
+    setProblems(prev => prev.filter(p => p.fileId !== fileId));
+  };
+
   const handleNewItem = (type: 'file' | 'folder', parentId: string) => {
     setNewItemModal({ type, parentId });
   };
@@ -516,9 +549,23 @@ const App: React.FC = () => {
       setNewItemModal(null);
 
       if (type === 'file') {
-        setOpenTabs(tabs => [...tabs, newId]);
+        setOpenTabs(produce(draft => { draft.push(newId); }));
         setActiveTabId(newId);
       }
+  };
+
+  const handleCreateEmptyGroup = () => {
+    setOpenTabs(
+      produce((draft) => {
+        draft.push({
+          id: nanoid(8),
+          name: 'New Group',
+          color: '#8b5cf6', // purple-500
+          isCollapsed: false,
+          children: [],
+        });
+      })
+    );
   };
 
   const handleSoftDelete = useCallback((itemId: string) => {
@@ -530,24 +577,42 @@ const App: React.FC = () => {
         }
     }));
 
-    // Use functional updates to avoid stale state
-    setOpenTabs(currentOpenTabs => {
-      const newTabs = currentOpenTabs.filter(t => t !== itemId);
+    setOpenTabs(produce(draft => {
+        const location = findTabAndLocation(draft, itemId);
+        if (!location) return draft;
 
-      setActiveTabId(currentActiveTabId => {
-        if (currentActiveTabId === itemId) {
-          if (newTabs.length > 0) {
-            const tabIndex = currentOpenTabs.indexOf(itemId);
-            return newTabs[Math.max(0, tabIndex - 1)];
-          }
-          return '';
+        const allTabIds = draft.flatMap(item => typeof item === 'string' ? item : item.children);
+        const closingTabIndex = allTabIds.indexOf(itemId);
+        let nextActiveId = activeTabId;
+
+        if (itemId === activeTabId) {
+             if (allTabIds.length > 1) {
+                const nextIndex = closingTabIndex === 0 ? 1 : closingTabIndex - 1;
+                // a bit tricky if next index is also the closing one
+                const finalIndex = allTabIds[nextIndex] === itemId ? closingTabIndex + 1 : nextIndex;
+                if(finalIndex < allTabIds.length) {
+                   nextActiveId = allTabIds[finalIndex];
+                } else {
+                   nextActiveId = allTabIds[closingTabIndex - 1];
+                }
+             } else {
+                nextActiveId = '';
+             }
         }
-        return currentActiveTabId;
-      });
-
-      return newTabs;
-    });
-  }, []);
+        setActiveTabId(nextActiveId);
+        
+        const { topLevelIndex, childIndex, group } = location;
+        if (group) {
+            const groupInDraft = draft[topLevelIndex] as TabGroup;
+            groupInDraft.children.splice(childIndex, 1);
+            if (groupInDraft.children.length === 0) {
+                draft.splice(topLevelIndex, 1);
+            }
+        } else {
+            draft.splice(topLevelIndex, 1);
+        }
+    }));
+  }, [activeTabId]);
 
   const handlePermanentDelete = useCallback((itemId: string) => {
       const allIdsToDelete = new Set<string>();
@@ -577,17 +642,30 @@ const App: React.FC = () => {
       
       const idsToDeleteArray = Array.from(allIdsToDelete);
 
-      setOpenTabs(currentOpenTabs => {
-        const newTabs = currentOpenTabs.filter(t => !idsToDeleteArray.includes(t));
-        setActiveTabId(currentActiveTabId => {
-          if (idsToDeleteArray.includes(currentActiveTabId)) {
-            return newTabs[0] || '';
+      setOpenTabs(produce(draft => {
+          let newActiveTabId = activeTabId;
+          if (idsToDeleteArray.includes(activeTabId)) {
+              const allCurrentIds = draft.flatMap(item => typeof item === 'string' ? item : item.children);
+              const remainingIds = allCurrentIds.filter(id => !idsToDeleteArray.includes(id));
+              newActiveTabId = remainingIds[0] || '';
           }
-          return currentActiveTabId;
-        });
-        return newTabs;
-      });
-  }, [fileSystem]);
+          setActiveTabId(newActiveTabId);
+          
+          for (let i = draft.length - 1; i >= 0; i--) {
+              const item = draft[i];
+              if (typeof item === 'string') {
+                  if (idsToDeleteArray.includes(item)) {
+                      draft.splice(i, 1);
+                  }
+              } else {
+                  item.children = item.children.filter(childId => !idsToDeleteArray.includes(childId));
+                  if (item.children.length === 0) {
+                      draft.splice(i, 1);
+                  }
+              }
+          }
+      }));
+  }, [fileSystem, activeTabId]);
 
   const handleRestore = useCallback((itemId: string) => {
     setFileSystem(produce(draft => {
@@ -642,7 +720,7 @@ const App: React.FC = () => {
                 onStateChange: setAiAssistantState,
                 onHistoryChange: setAiChatHistory,
                 onFileSystemChange: (updater) => setFileSystem(produce(updater)),
-                setOpenTabs,
+                setOpenTabs: setOpenTabs,
                 setActiveTabId,
                 onConfirm: (confirmationMessage: string) => {
                     return new Promise(resolve => {
@@ -657,6 +735,15 @@ const App: React.FC = () => {
         });
     };
 
+    const handleOpenFile = (fileId: string) => {
+      const allOpenIds = openTabs.flatMap(item => typeof item === 'string' ? item : item.children);
+      if (!allOpenIds.includes(fileId)) {
+        setOpenTabs(produce(draft => {
+          draft.push(fileId);
+        }));
+      }
+      setActiveTabId(fileId);
+    };
 
   const primaryDisplayControls = [
     { id: 'play', icon: isRunning ? <PauseIcon /> : (isExecuting ? <ArrowPathIcon className="w-6 h-6 animate-spin" /> : <PlayIcon />), onClick: handleToggleReplay, isPrimary: true, disabled: isExecuting || executionStepsRef.current.length === 0 },
@@ -699,14 +786,16 @@ const App: React.FC = () => {
       setProblems(prev => [...prev, problem]);
   }, []);
 
+  const openTabIds = openTabs.flatMap(item => typeof item === 'string' ? item : item.children);
+
   const renderLayout = () => {
     const panelComponentMap: Record<PanelComponentKey, React.ReactElement | null> = {
       CombinedSidebarPanel: <CombinedSidebarPanel
         // FileTreePanel Props
         fileSystem={fileSystem}
         setFileSystem={setFileSystem}
-        openTabs={openTabs}
-        setOpenTabs={setOpenTabs}
+        openTabIds={openTabIds}
+        onOpenFile={handleOpenFile}
         activeTabId={activeTabId}
         setActiveTabId={setActiveTabId}
         onNewItem={handleNewItem}
@@ -722,14 +811,15 @@ const App: React.FC = () => {
         actions={editorActions}
         activeTabId={activeTabId}
         openTabs={openTabs}
+        setOpenTabs={setOpenTabs}
         fileSystem={fileSystem}
         problems={problems}
         settings={settings}
         onTabClick={setActiveTabId}
-        onTabsReorder={setOpenTabs}
         onTabClose={handleSoftDelete}
         onCodeChange={updateCode}
         onNewFileClick={() => handleNewItem('file', 'root')}
+        onNewGroupClick={handleCreateEmptyGroup}
         onAddProblem={handleAddProblem}
         onRunSelection={handleRunSelection}
       />,
@@ -740,7 +830,10 @@ const App: React.FC = () => {
         logs={logs}
         problems={problems}
         activeLanguage={activeLanguage}
+        fileSystem={fileSystem}
+        activeFileId={activeTabId}
         onApplyFix={handleApplyCodeFix}
+        onReplaceFileContent={handleReplaceFileContent}
       /></div>,
       PrimaryDisplayPanel: <PrimaryDisplayPanel 
         controls={primaryDisplayControls} 

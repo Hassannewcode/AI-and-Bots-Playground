@@ -176,6 +176,83 @@ ${code}
     }
 };
 
+export const getFixForAllCodeErrors = async (
+    code: string,
+    language: string,
+    problems: { line: number; message: string }[]
+): Promise<{ explanation: string; fixedCode: string; }> => {
+    if (!process.env.API_KEY) {
+        throw new Error("API_KEY is not configured for error fixing.");
+    }
+
+    const langName = language === 'py' ? 'Python' : 'JavaScript';
+    const problemsString = problems.map(p => `- Line ${p.line}: ${p.message}`).join('\n');
+
+    const prompt = `You are an expert code-fixing AI assistant integrated directly into a user's IDE. Your task is to fix multiple errors in a single file while perfectly matching the user's existing coding style.
+
+**CRITICAL INSTRUCTION: Emulate the user's style.**
+Analyze the user's entire code to understand their style (indentation, whitespace, naming conventions, etc.). The corrected code MUST feel like it was written by the original author.
+
+**Your Task:**
+Based on the provided code and list of errors:
+1.  Identify and fix the root cause of ALL the listed errors.
+2.  Provide a brief, single-paragraph summary explaining the key changes you made.
+3.  Return the ENTIRETY of the corrected code for the file.
+
+**Output Format:**
+Return ONLY a valid JSON object with two keys: "explanation" and "fixedCode".
+
+Example Response:
+{
+  "explanation": "Fixed a misspelled variable 'mesage' to 'message' and corrected the loop range to avoid an off-by-one error.",
+  "fixedCode": "# The entire corrected python file content...\\n# ...with all fixes applied\\nbot.say(message=\\"Hello World!\\")\\nfor i in range(10):\\n    print(i)"
+}
+
+---
+LANGUAGE: ${langName}
+
+LIST OF ERRORS TO FIX:
+${problemsString}
+
+USER'S FULL CODE:
+\`\`\`${language}
+${code}
+\`\`\`
+---
+`;
+
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        explanation: { type: Type.STRING },
+                        fixedCode: { type: Type.STRING },
+                    },
+                    required: ["explanation", "fixedCode"],
+                },
+            },
+        });
+        
+        const text = response.text;
+        if (!text) {
+             throw new Error("AI failed to generate fixes. The response may have been blocked.");
+        }
+        const jsonStr = text.trim();
+        return JSON.parse(jsonStr);
+
+    } catch (error) {
+        console.error("Error getting bulk code fix from Gemini API:", error);
+        throw new Error("AI failed to generate fixes. The model's response might have been blocked or the API key is invalid.");
+    }
+};
+
 export const transpileCode = async (code: string, sourceLanguage: string): Promise<string> => {
      if (!process.env.API_KEY) {
         throw new Error("API_KEY is not configured for transpilation.");

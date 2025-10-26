@@ -9,7 +9,7 @@ import { FolderIcon, SparklesIcon } from '../icons';
 
 // This combines the props from both panels.
 // In App.tsx, we'll pass all necessary props to this container.
-type CombinedSidebarPanelProps = FileTreePanelProps & AIChatPanelProps;
+type CombinedSidebarPanelProps = Omit<FileTreePanelProps, 'openTabs' | 'setOpenTabs'> & AIChatPanelProps;
 
 export const CombinedSidebarPanel: React.FC<CombinedSidebarPanelProps> = (props) => {
     const [activeView, setActiveView] = useState<'explorer' | 'ai'>('explorer');

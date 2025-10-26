@@ -1,7 +1,8 @@
 import { produce } from 'immer';
 import { nanoid } from 'nanoid';
 import { GoogleGenAI, Type, FunctionDeclaration, Content, FunctionCall, Part } from '@google/genai';
-import type { FileSystemTree, FileSystemNode } from '../game/types';
+import type { FileSystemTree, FileSystemNode, TabBarItem } from '../game/types';
+import type { Dispatch, SetStateAction } from 'react';
 
 // Type for the callbacks to interact with App state
 interface ToolHandlerCallbacks {
@@ -9,7 +10,8 @@ interface ToolHandlerCallbacks {
     setFileSystem: (updater: (draft: FileSystemTree) => void) => void;
     onConfirm: (message: string) => Promise<boolean>;
     setActiveTabId: (updater: string | ((currentId: string) => string)) => void;
-    setOpenTabs: (updater: (tabs: string[]) => string[]) => void;
+    // Fix: Updated type to match React's state setter for TabBarItem[]
+    setOpenTabs: Dispatch<SetStateAction<TabBarItem[]>>;
 }
 
 // Helper to find a file by name
@@ -155,8 +157,28 @@ export const getToolHandlers = (callbacks: ToolHandlerCallbacks) => ({
                 }
             });
 
+            // Fix: Correctly remove file from open tabs, including from within groups.
             callbacks.setOpenTabs(currentOpenTabs => {
-                return currentOpenTabs.filter(t => t !== fileId);
+                const newTabs = produce(currentOpenTabs, draft => {
+                    for (let i = draft.length - 1; i >= 0; i--) {
+                        const item = draft[i];
+                        if (typeof item === 'string') {
+                            if (item === fileId) {
+                                draft.splice(i, 1);
+                            }
+                        } else { // It's a group
+                            const childIndex = item.children.indexOf(fileId);
+                            if (childIndex > -1) {
+                                item.children.splice(childIndex, 1);
+                            }
+                            // If group becomes empty, remove it.
+                            if (item.children.length === 0) {
+                                draft.splice(i, 1);
+                            }
+                        }
+                    }
+                });
+                return newTabs;
             });
             
             // This is a simplified active tab reset, might need improvement

@@ -1,5 +1,3 @@
-
-
 import { Sprite, ExecutionResult, Problem, ExecutionStep, FileSystemTree } from './types';
 import { nanoid } from 'nanoid';
 
@@ -240,9 +238,19 @@ export async function executePythonCode(
         logs.push(`Execution successful. ${steps.length} steps generated.`);
 
     } catch (e: any) {
-        const errorMessage = e.message || "An unknown Python error occurred.";
+        // Clean the traceback to get a more concise error message for the AI
+        const cleanErrorMessage = (rawMessage: string): string => {
+            if (!rawMessage) return "An unknown Python error occurred.";
+            const lines = rawMessage.split('\n');
+            const lastLine = lines.filter(line => line.trim().length > 0).pop();
+            return lastLine || rawMessage; // Fallback to raw message
+        };
+        
+        const rawErrorMessage = e.message || "An unknown Python error occurred.";
+        const errorMessage = cleanErrorMessage(rawErrorMessage);
+        
         const tracebackRegex = /File "<exec>", line (\d+)/;
-        const match = errorMessage.match(tracebackRegex);
+        const match = rawErrorMessage.match(tracebackRegex);
         
         let finalLine = match ? parseInt(match[1], 10) : 1;
         

@@ -168,7 +168,16 @@ export async function executeJavaScriptCode(code: string, fileSystem: FileSystem
         logs.push(`Execution successful. ${steps.length} steps generated.`);
     } catch (e) {
         const error = e as Error;
-        const message = error.message || "An unknown JavaScript error occurred.";
+        
+        // Clean the error message to remove potential noise
+        const cleanErrorMessage = (rawMessage: string): string => {
+            if (!rawMessage) return "An unknown JavaScript error occurred.";
+            // JS errors are often single-line, but this takes the first line just in case.
+            const lines = rawMessage.split('\n');
+            return lines[0] || rawMessage;
+        };
+        
+        const message = cleanErrorMessage(error.message);
         
         const stackLine = error.stack?.split('\n')[1] || '';
         const lineMatch = stackLine.match(/<anonymous>:(\d+):(\d+)/);

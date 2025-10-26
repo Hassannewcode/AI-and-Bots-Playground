@@ -1,12 +1,14 @@
 import { GoogleGenAI, FunctionDeclaration, Content, FunctionCall, Part } from '@google/genai';
-import type { FileSystemTree, Problem } from '../game/types';
+import type { FileSystemTree, Problem, TabBarItem } from '../game/types';
 import type { AIStateStatus } from './types';
 import { buildContextPackage, formatContextForPrompt } from './context-builder';
 import { assistantTools, getToolHandlers } from './tool-manager';
+import type { Dispatch, SetStateAction } from 'react';
 
 interface AppStateForAI {
     fileSystem: FileSystemTree;
-    openTabs: string[];
+    // Fix: Changed from string[] to TabBarItem[] to match the actual state type.
+    openTabs: TabBarItem[];
     activeTabId: string;
     logs: string[];
     problems: Problem[];
@@ -16,7 +18,8 @@ interface AssistantCallbacks {
     onStateChange: (state: AIStateStatus) => void;
     onHistoryChange: (updater: (history: Content[]) => Content[]) => void;
     onFileSystemChange: (updater: (draft: FileSystemTree) => void) => void;
-    setOpenTabs: (updater: (tabs: string[]) => string[]) => void;
+    // Fix: Updated type to match React's state setter for TabBarItem[]
+    setOpenTabs: Dispatch<SetStateAction<TabBarItem[]>>;
     setActiveTabId: (id: string) => void;
     onConfirm: (message: string) => Promise<boolean>;
 }

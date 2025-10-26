@@ -1,5 +1,3 @@
-
-
 import type { CSSProperties } from 'react';
 
 export interface Prop {
@@ -116,6 +114,18 @@ export type FileSystemNode =
 export interface FileSystemTree {
   [id: string]: FileSystemNode;
 }
+
+// Tab Group Types
+export interface TabGroup {
+  id: string;
+  name: string;
+  color: string;
+  isCollapsed: boolean;
+  children: string[]; // array of file IDs
+}
+
+export type TabBarItem = string | TabGroup;
+
 
 // Autocomplete Types
 export type SuggestionType = 'class' | 'method' | 'param' | 'library' | 'variable' | 'keyword' | 'function';

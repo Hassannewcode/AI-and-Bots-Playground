@@ -6,8 +6,8 @@ import { FolderIcon, FileIcon, ChevronRightIcon, ChevronDownIcon } from '../icon
 export interface FileTreePanelProps {
     fileSystem: FileSystemTree;
     setFileSystem: React.Dispatch<React.SetStateAction<FileSystemTree>>;
-    openTabs: string[];
-    setOpenTabs: React.Dispatch<React.SetStateAction<string[]>>;
+    openTabIds: string[]; // Changed from openTabs
+    onOpenFile: (fileId: string) => void; // New prop
     activeTabId: string;
     setActiveTabId: React.Dispatch<React.SetStateAction<string>>;
     onNewItem: (type: 'file' | 'folder', parentId: string) => void;
@@ -195,7 +195,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
     );
 };
 
-export const FileTreePanel: React.FC<FileTreePanelProps> = ({ fileSystem, setFileSystem, openTabs, setOpenTabs, activeTabId, setActiveTabId, onNewItem, onSoftDelete, onPermanentDelete, onRestore }) => {
+export const FileTreePanel: React.FC<FileTreePanelProps> = ({ fileSystem, setFileSystem, onOpenFile, onNewItem, onSoftDelete, onPermanentDelete, onRestore }) => {
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, nodeId: string } | null>(null);
     const [currentTime, setCurrentTime] = useState(Date.now());
 
@@ -208,10 +208,7 @@ export const FileTreePanel: React.FC<FileTreePanelProps> = ({ fileSystem, setFil
 
     const handleNodeClick = (node: FileSystemNode) => {
         if (node.type === 'file' && node.status !== 'deleted') {
-            if (!openTabs.includes(node.id)) {
-                setOpenTabs(tabs => [...tabs, node.id]);
-            }
-            setActiveTabId(node.id);
+            onOpenFile(node.id);
         }
     };
 
