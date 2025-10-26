@@ -167,7 +167,12 @@ ${code}
             console.error("Error getting code fix from Gemini API: received an empty response.");
             throw new Error("AI failed to generate a fix. The response may have been blocked.");
         }
-        const jsonStr = text.trim();
+        let jsonStr = text.trim();
+        // Clean potential markdown fences
+        const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+            jsonStr = jsonMatch[1];
+        }
         return JSON.parse(jsonStr);
 
     } catch (error) {
@@ -244,7 +249,11 @@ ${code}
         if (!text) {
              throw new Error("AI failed to generate fixes. The response may have been blocked.");
         }
-        const jsonStr = text.trim();
+        let jsonStr = text.trim();
+        const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+            jsonStr = jsonMatch[1];
+        }
         return JSON.parse(jsonStr);
 
     } catch (error) {

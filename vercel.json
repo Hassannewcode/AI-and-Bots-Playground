@@ -1,21 +1,17 @@
-
 {
+  "version": 2,
+  "public": true,
   "framework": null,
   "headers": [
     {
-      "source": "/(.*\\.tsx)",
+      "source": "/(.*)",
       "headers": [
-        { "key": "Content-Type", "value": "text/javascript" }
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
       ]
     },
     {
-      "source": "/(.*\\.ts)",
-      "headers": [
-        { "key": "Content-Type", "value": "text/javascript" }
-      ]
-    },
-    {
-      "source": "/(.*\\.jsx)",
+      "source": "/(.*\\.(?:tsx|ts|jsx))",
       "headers": [
         { "key": "Content-Type", "value": "text/javascript" }
       ]

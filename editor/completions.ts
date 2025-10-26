@@ -1,4 +1,3 @@
-
 import type { Suggestion, SuggestionType } from '../game/types';
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -308,7 +307,12 @@ ${codeWithCursor}
             return [];
         }
 
-        const jsonStr = text.trim();
+        let jsonStr = text.trim();
+        // Clean potential markdown fences
+        const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+            jsonStr = jsonMatch[1];
+        }
         const suggestions = JSON.parse(jsonStr);
         
         if (Array.isArray(suggestions) && suggestions.every(s => typeof s === 'string')) {

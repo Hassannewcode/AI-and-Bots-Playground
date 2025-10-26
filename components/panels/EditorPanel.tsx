@@ -292,32 +292,65 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
             );
         } else {
             const group = item;
+            const isDropTargetForTab = dropTarget.current?.type === 'group' && dropTarget.current.id === group.id && dropTarget.current.position === 'over' && draggedItem.current?.type === 'tab';
+
             return (
-                <div draggable onDragStart={(e) => handleDragStart(e, 'group', group.id)} onDragOver={(e) => handleDragOver(e, 'group', group.id)}
-                    className={`flex items-center rounded-l-md mr-1 ${isDragged ? 'opacity-30' : ''}`} style={{ backgroundColor: group.isCollapsed ? group.color + '40' : 'transparent' }}>
-                    <div onClick={() => handleToggleCollapse(group.id)} onContextMenu={(e) => handleContextMenu(e, group)} title={group.name}
-                        className="flex items-center px-2 h-6 rounded-md cursor-pointer hover:bg-white/20" style={{ color: group.color }}>
+                <div
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, 'group', group.id)}
+                    onDragOver={(e) => handleDragOver(e, 'group', group.id)}
+                    className={`flex items-center h-full mx-1 p-1 rounded-lg border transition-all duration-150 ${isDragged ? 'opacity-30' : ''} ${isDropTargetForTab ? 'bg-white/10' : ''}`}
+                    style={{ borderColor: group.color }}
+                >
+                    {/* Group Header Pill */}
+                    <div
+                        onClick={() => handleToggleCollapse(group.id)}
+                        onContextMenu={(e) => handleContextMenu(e, group)}
+                        title={group.name}
+                        className="flex items-center px-2 h-8 rounded-md cursor-pointer hover:bg-white/20 flex-shrink-0"
+                        style={{ color: group.color }}
+                    >
                         <div className="w-2.5 h-2.5 rounded-full mr-1.5" style={{ backgroundColor: group.color }}></div>
-                        <span className="text-xs font-bold">{group.name}</span>
+                        <span className="text-xs font-bold whitespace-nowrap">{group.name}</span>
                     </div>
+        
+                    {/* Vertical separator */}
+                    {!group.isCollapsed && group.children.length > 0 &&
+                        <div className="w-px h-6 mx-1 self-center" style={{ backgroundColor: group.color, opacity: 0.5 }}></div>
+                    }
+        
+                    {/* Tabs container */}
                     {!group.isCollapsed && group.children.map(fileId => {
                         const file = fileSystem[fileId];
                         if (!file || file.status === 'deleted') return null;
+        
                         const isActive = fileId === activeTabId;
                         const isChildDragged = draggedItem.current?.type === 'tab' && draggedItem.current.id === fileId;
                         const isChildDropTarget = dropTarget.current?.type === 'tab' && dropTarget.current.id === fileId;
+        
                         return (
-                            <div key={fileId} className="flex items-center">
-                                {isChildDropTarget && dropTarget.current?.position === 'before' && <div className="w-0.5 h-6 self-center" style={{backgroundColor: group.color}}/>}
-                                <div draggable onDragStart={(e) => handleDragStart(e, 'tab', fileId, group.id)} onDragOver={(e) => handleDragOver(e, 'tab', fileId)} onClick={() => onTabClick(fileId)} onContextMenu={(e) => handleContextMenu(e, fileId, group.id)} title={file.name}
-                                    className={`flex items-center px-3 h-10 border-b-2 cursor-pointer hover:bg-[#22252a] transition-opacity ${isActive ? 'bg-[#1e2026] text-white' : 'text-gray-400'} ${isChildDragged ? 'opacity-30' : ''}`}
-                                    style={{ borderColor: isActive ? group.color : 'transparent' }}>
-                                    <FileIcon className="w-4 h-4 mr-2 text-gray-500" /> <span className="text-xs font-semibold">{file.name}</span>
-                                    <button onClick={(e) => { e.stopPropagation(); onTabClose(fileId); }} title="Close tab" className="ml-3 text-gray-500 hover:text-white rounded-full hover:bg-gray-600 p-0.5"><XMarkIcon className="w-3 h-3" /></button>
+                            <div key={fileId} className="flex items-center h-full">
+                                {isChildDropTarget && dropTarget.current?.position === 'before' && <div className="w-0.5 h-6 self-center" style={{ backgroundColor: group.color }} />}
+                                
+                                <div
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, 'tab', fileId, group.id)}
+                                    onDragOver={(e) => handleDragOver(e, 'tab', fileId)}
+                                    onClick={() => onTabClick(fileId)}
+                                    onContextMenu={(e) => handleContextMenu(e, fileId, group.id)}
+                                    title={file.name}
+                                    className={`flex items-center px-3 h-8 rounded-md cursor-pointer transition-colors ${isActive ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'} ${isChildDragged ? 'opacity-30' : ''}`}
+                                >
+                                    <FileIcon className="w-4 h-4 mr-2 text-gray-500" />
+                                    <span className="text-xs font-semibold">{file.name}</span>
+                                    <button onClick={(e) => { e.stopPropagation(); onTabClose(fileId); }} title="Close tab" className="ml-3 text-gray-500 hover:text-white rounded-full hover:bg-gray-600 p-0.5">
+                                        <XMarkIcon className="w-3 h-3" />
+                                    </button>
                                 </div>
-                                {isChildDropTarget && dropTarget.current?.position === 'after' && <div className="w-0.5 h-6 self-center" style={{backgroundColor: group.color}}/>}
+        
+                                {isChildDropTarget && dropTarget.current?.position === 'after' && <div className="w-0.5 h-6 self-center" style={{ backgroundColor: group.color }} />}
                             </div>
-                        )
+                        );
                     })}
                 </div>
             );
