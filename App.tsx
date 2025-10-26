@@ -5,7 +5,7 @@ import { GoogleGenAI, Type, FunctionDeclaration, Content, FunctionCall, Part } f
 
 import { parseCode } from './game/engine';
 import { getGeminiResponse, getAiThought } from './game/gemini';
-import type { GameState, Problem, ExecutionStep, FileSystemTree, FileSystemNode, PanelLayout, PanelComponentKey, TabBarItem, TabGroup } from './game/types';
+import type { GameState, Problem, ExecutionStep, FileSystemTree, FileSystemNode, PanelLayout, PanelComponentKey, TabBarItem, TabGroup, ActionButton } from './game/types';
 import type { AIStateStatus } from './ai/types';
 import { runAssistantTurn } from './ai/assistant';
 import { toggleFullscreen, shareCode } from './controls/gameControls';
@@ -191,7 +191,7 @@ const App: React.FC = () => {
   const executionStepsRef = useRef<ExecutionStep[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  const [isExecuting, setIsExecuting] = useState(false); // For compilation/parsing
+  const [executingActionId, setExecutingActionId] = useState<string | null>(null);
   const runnerTimeoutRef = useRef<number | null>(null);
 
   const [isHelpOpen, setHelpOpen] = useState(false);
@@ -228,6 +228,7 @@ const App: React.FC = () => {
   const activeFile = fileSystem[activeTabId];
   const code = (activeFile?.type === 'file' ? activeFile.code : '') || '';
   const activeLanguage = activeFile?.name.split('.').pop() || 'txt';
+  const isExecuting = executingActionId !== null;
 
   const processStep = useCallback(async (step: ExecutionStep) => {
       // Synchronous state updates
@@ -419,8 +420,8 @@ const App: React.FC = () => {
         setLogs(prev => [...prev, 'Replay is ready. Press play to start.']);
     }, []);
 
-    const handleRun = async (runCode: string, lang: string, fileId: string) => {
-        setIsExecuting(true);
+    const handleRun = async (runCode: string, lang: string, fileId: string, actionId: string) => {
+        setExecutingActionId(actionId);
         // Stop any current replay
         setIsRunning(false);
         if (runnerTimeoutRef.current) clearTimeout(runnerTimeoutRef.current);
@@ -456,18 +457,18 @@ const App: React.FC = () => {
             executionStepsRef.current = [];
             prepareForReplay();
         } finally {
-            setIsExecuting(false);
+            setExecutingActionId(null);
         }
     };
   
   const handleRunCurrentFile = () => {
     if (activeFile?.type !== 'file' || isExecuting || activeFile?.status === 'deleted') return;
-    handleRun(activeFile.code, activeLanguage, activeTabId);
+    handleRun(activeFile.code, activeLanguage, activeTabId, 'primary');
   };
 
   const handleRunSelection = (selectedCode: string) => {
     if (activeFile?.type !== 'file' || isExecuting || activeFile?.status === 'deleted') return;
-    handleRun(selectedCode, activeLanguage, activeTabId);
+    handleRun(selectedCode, activeLanguage, activeTabId, 'primary');
   };
 
   const handleRunAllOpenFiles = () => {
@@ -485,8 +486,36 @@ const App: React.FC = () => {
       
       const combinedCode = runnableTabs.map(node => node.code).join('\n\n');
       // Use the language and fileId of the active tab as the primary context
-      handleRun(combinedCode, activeLanguage, activeTabId);
+      handleRun(combinedCode, activeLanguage, activeTabId, 'all_files');
   };
+
+  const handleRunGroupFiles = (groupId: string) => {
+    if (isExecuting) return;
+    
+    const group = openTabs.find(item => typeof item !== 'string' && item.id === groupId) as TabGroup | undefined;
+    if (!group) {
+        setLogs(prev => [...prev, `[System Error] Could not find group to run.`]);
+        return;
+    }
+
+    const runnableTabs = group.children
+        .map(id => fileSystem[id])
+        .filter((node): node is Extract<FileSystemNode, {type: 'file'}> => 
+            !!node && 
+            node.type === 'file' && 
+            (node.name.endsWith('.js') || node.name.endsWith('.jsx') || node.name.endsWith('.ts') || node.name.endsWith('.tsx') || node.name.endsWith('.py')) && 
+            node.status !== 'deleted'
+        );
+
+    if (runnableTabs.length === 0) {
+        setLogs(prev => [...prev, `No runnable files found in the group "${group.name}".`]);
+        return;
+    }
+    
+    const combinedCode = runnableTabs.map(node => node.code).join('\n\n');
+    // Use the language and fileId of the active tab as the primary context
+    handleRun(combinedCode, activeLanguage, activeTabId, 'group');
+};
 
     const handleToggleReplay = () => {
         if (isExecuting || executionStepsRef.current.length === 0) {
@@ -852,18 +881,31 @@ const App: React.FC = () => {
   const editorActions = [ {id: 'settings', icon: <Cog6ToothIcon />, onClick: () => setSettingsOpen(true)} ];
   const currentUser = { name: 'Current User', avatar: <UserCircleIcon className="w-full h-full text-gray-500" />, status: 'ONLINE', rank: 'N/A', rankIcon: <StarIcon /> };
   
-  type ActionButton = {
-    id: string;
-    text: string;
-    icon: React.ReactNode;
-    onClick: () => void;
-    style: 'primary' | 'secondary';
-  };
+  const activeFileGroupId = openTabs
+    .find((item): item is TabGroup => typeof item !== 'string' && item.children.includes(activeTabId))
+    ?.id;
 
-  const actionButtons: ActionButton[] = [
-    { id: 'primary', text: 'Run This File', icon: <PlayIcon />, onClick: handleRunCurrentFile, style: 'primary' },
-    { id: 'secondary', text: 'Run All Open Files', icon: <PlayIcon />, onClick: handleRunAllOpenFiles, style: 'secondary' },
-  ];
+    const actionButtons: ActionButton[] = [
+        { id: 'primary', text: 'Run This File', icon: <PlayIcon />, onClick: handleRunCurrentFile, style: 'primary' },
+    ];
+
+    if (activeFileGroupId) {
+        actionButtons.push({ 
+            id: 'group', 
+            text: 'Run Files in Group', 
+            icon: <PlayIcon />, 
+            onClick: () => handleRunGroupFiles(activeFileGroupId), 
+            style: 'secondary' 
+        });
+    }
+
+    actionButtons.push({ 
+        id: 'all_files', 
+        text: 'Run All Open Files', 
+        icon: <PlayIcon />, 
+        onClick: handleRunAllOpenFiles, 
+        style: 'secondary' 
+    });
   
   const handleAddProblem = useCallback((problem: Problem) => {
       setProblems(prev => [...prev, problem]);
@@ -936,7 +978,7 @@ const App: React.FC = () => {
         title="Actions" 
         buttons={actionButtons} 
         onHelpClick={() => setHelpOpen(true)}
-        isExecuting={isExecuting}
+        executingActionId={executingActionId}
       />,
       // These are now part of CombinedSidebarPanel and should not be rendered directly
       FileTreePanel: null,

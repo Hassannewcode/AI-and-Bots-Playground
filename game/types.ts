@@ -161,3 +161,11 @@ export interface EditorCommand {
   // Optional keybinding to display
   keybinding?: string;
 }
+
+export type ActionButton = {
+  id: string;
+  text: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  style: 'primary' | 'secondary';
+};
