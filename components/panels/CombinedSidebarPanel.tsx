@@ -18,7 +18,7 @@ export const CombinedSidebarPanel: React.FC<CombinedSidebarPanelProps> = (props)
         if (activeView === 'explorer') {
             // FileTreePanel now expects its container to handle overflow
             return (
-                <div className="flex-grow overflow-y-auto">
+                <div className="flex-grow min-w-0 overflow-y-auto">
                     <FileTreePanel {...props} />
                 </div>
             );
@@ -53,7 +53,7 @@ export const CombinedSidebarPanel: React.FC<CombinedSidebarPanelProps> = (props)
             </div>
 
             {/* Content */}
-            <div className="flex-grow min-h-0 relative">
+            <div className="flex-grow min-h-0 relative flex">
                 {renderContent()}
             </div>
         </div>

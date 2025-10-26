@@ -249,7 +249,7 @@ export const FileTreePanel: React.FC<FileTreePanelProps> = ({ fileSystem, setFil
     if (!rootNode || rootNode.type !== 'folder') return null;
 
     return (
-        <div className="h-full" onContextMenu={(e) => handleContextMenu(e, rootNode)}>
+        <div onContextMenu={(e) => handleContextMenu(e, rootNode)}>
             {rootNode.children.map(nodeId => (
                 <NodeComponent 
                     key={nodeId} 

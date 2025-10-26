@@ -65,7 +65,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ messages, onSendMessag
     };
 
     return (
-        <div className="h-full flex flex-col bg-[#272a33] min-h-0">
+        <div className="flex-grow min-w-0 flex flex-col bg-[#272a33] min-h-0">
             <div className="flex-grow p-2 space-y-4 overflow-y-auto text-xs">
                 {messages.map((msg, index) => (
                     <div key={index} className={`flex items-start space-x-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
