@@ -79,6 +79,34 @@ async function getPyodideViaPyScript() {
     return pyodideViaPyScriptPromise;
 }
 
+export async function installPythonPackage(
+    packages: string[], 
+    engine: 'pyodide' | 'pyscript', 
+    logCallback: (message: string) => void
+): Promise<void> {
+    try {
+        logCallback("Initializing Python environment...");
+        const pyodide = engine === 'pyodide' 
+           ? await getPyodideDirectly() 
+           : await getPyodideViaPyScript();
+
+        if (!pyodide) {
+            throw new Error("Python interpreter (Pyodide) failed to initialize.");
+        }
+
+        logCallback("Loading micropip...");
+        await pyodide.loadPackage("micropip");
+        const micropip = pyodide.pyimport("micropip");
+
+        logCallback(`Installing ${packages.join(', ')}... (This may take a while)`);
+        await micropip.install(packages);
+    } catch (e: any) {
+        console.error("Error installing Python package:", e);
+        throw new Error(e.message || "An unknown error occurred during package installation.");
+    }
+}
+
+
 // Helper to convert PyProxy kwargs to a JS object
 function kwargsToJs(kwargs: any): Record<string, any> {
     if (!kwargs || typeof kwargs.toJs !== 'function') return {};

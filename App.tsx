@@ -9,6 +9,7 @@ import type { GameState, Problem, ExecutionStep, FileSystemTree, FileSystemNode,
 import type { AIStateStatus } from './ai/types';
 import { runAssistantTurn } from './ai/assistant';
 import { toggleFullscreen, shareCode } from './controls/gameControls';
+import { installPythonPackage } from './game/python_engine';
 
 // Components
 import { PrimaryDisplayPanel } from './components/panels/PrimaryDisplayPanel';
@@ -42,6 +43,7 @@ const initialFiles: FileSystemTree = {
     code: [
       '# Welcome to the Universal Playground!',
       '# Your world is now defined in world.html!',
+      '# You can install packages in the console with `pip install <package_name>`',
       '',
       '# Create a sprite and give it a brain',
       'bot = ai.Sprite(name="PythonBot", shape="user", x=10, y=85)',
@@ -72,6 +74,7 @@ const initialFiles: FileSystemTree = {
         '*   **AI Error Fixes**: When your code fails, an error appears in the **Problems** tab. Click the ✨ button to get an AI-powered explanation and a suggested fix from Gemini.',
         '*   **Integrated Sprite AI**: The `neurons` library has been merged into sprites. You can now call `your_sprite.create_network()` and `your_sprite.reward()` directly.',
         '*   **Real Execution**: Your Python and JavaScript code run in real, sandboxed environments. Other languages are for syntax highlighting only.',
+        '*   **Package Management**: Install Python packages from PyPI directly from the console using `pip install <package_name>`.',
         '',
         '## How to Run',
         '',
@@ -745,6 +748,35 @@ const App: React.FC = () => {
       setActiveTabId(fileId);
     };
 
+  const handleRunCommand = async (command: string) => {
+    setLogs(prev => [...prev, `> ${command}`]);
+    const parts = command.trim().split(/\s+/);
+    const commandName = parts[0].toLowerCase();
+
+    if (commandName === 'pip' && parts[1]?.toLowerCase() === 'install') {
+        const packages = parts.slice(2);
+        if (packages.length === 0) {
+            setLogs(prev => [...prev, 'Usage: pip install <package_name> ...']);
+            return;
+        }
+
+        try {
+            await installPythonPackage(packages, settings.pythonEngine, (logMessage) => {
+                setLogs(prev => [...prev, logMessage]);
+            });
+            setLogs(prev => [...prev, `Successfully installed: ${packages.join(', ')}.`]);
+        } catch (e) {
+            const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
+            setLogs(prev => [...prev, `Error installing packages: ${errorMessage}`]);
+            setProblems(prev => [...prev, { fileId: activeTabId, line: 0, message: `Package Installation Error: ${errorMessage}`, code: '', language: 'txt' }]);
+            if (activeOutputTabId !== 'guide') setActiveOutputTabId('problems');
+        }
+    } else {
+        setLogs(prev => [...prev, `Command not found: ${commandName}`]);
+    }
+  };
+
+
   const primaryDisplayControls = [
     { id: 'play', icon: isRunning ? <PauseIcon /> : (isExecuting ? <ArrowPathIcon className="w-6 h-6 animate-spin" /> : <PlayIcon />), onClick: handleToggleReplay, isPrimary: true, disabled: isExecuting || executionStepsRef.current.length === 0 },
     { id: 'step', icon: <ChevronRightIcon />, onClick: handleStepForward, disabled: isExecuting || isRunning || currentStep >= executionStepsRef.current.length },
@@ -834,6 +866,7 @@ const App: React.FC = () => {
         activeFileId={activeTabId}
         onApplyFix={handleApplyCodeFix}
         onReplaceFileContent={handleReplaceFileContent}
+        onRunCommand={handleRunCommand}
       /></div>,
       PrimaryDisplayPanel: <PrimaryDisplayPanel 
         controls={primaryDisplayControls} 

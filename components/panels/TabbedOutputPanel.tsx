@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { Problem, FileSystemTree } from '../../game/types';
 import { getFixForCodeError, getFixForAllCodeErrors } from '../../game/gemini';
 import { LanguageGuide } from '../guides/LanguageGuide';
@@ -16,6 +16,7 @@ interface TabbedOutputPanelProps {
     activeFileId: string;
     onApplyFix: (fileId: string, startLine: number, endLine: number, newCode: string) => void;
     onReplaceFileContent: (fileId: string, newCode: string) => void;
+    onRunCommand: (command: string) => void;
 }
 
 const AIFixComponent: React.FC<{ problem: Problem, onApplyFix: (fileId: string, startLine: number, endLine: number, newCode: string) => void }> = ({ problem, onApplyFix }) => {
@@ -83,13 +84,44 @@ const AIFixComponent: React.FC<{ problem: Problem, onApplyFix: (fileId: string, 
 }
 
 export const TabbedOutputPanel: React.FC<TabbedOutputPanelProps> = ({ 
-    tabs, onTabClick, activeTabId, logs, problems, activeLanguage, fileSystem, activeFileId, onApplyFix, onReplaceFileContent
+    tabs, onTabClick, activeTabId, logs, problems, activeLanguage, fileSystem, activeFileId, onApplyFix, onReplaceFileContent, onRunCommand
 }) => {
     const [isFixingAll, setIsFixingAll] = useState(false);
     const [fixAllError, setFixAllError] = useState('');
+    const [command, setCommand] = useState('');
+    
+    const consoleInputRef = useRef<HTMLInputElement>(null);
+    const consoleLogContainerRef = useRef<HTMLDivElement>(null);
 
     const problemsForActiveFile = problems.filter(p => p.fileId === activeFileId);
     const activeFileName = fileSystem[activeFileId]?.name || 'Current File';
+    
+    useEffect(() => {
+        // Scroll to bottom of logs when they change
+        if (activeTabId === 'console' && consoleLogContainerRef.current) {
+            consoleLogContainerRef.current.scrollTop = consoleLogContainerRef.current.scrollHeight;
+        }
+    }, [logs, activeTabId]);
+
+    useEffect(() => {
+        // Focus input when console tab is selected
+        if (activeTabId === 'console') {
+            consoleInputRef.current?.focus();
+        }
+    }, [activeTabId]);
+
+    const handleCommandSubmit = () => {
+        if (command.trim()) {
+            onRunCommand(command);
+            setCommand('');
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleCommandSubmit();
+        }
+    };
 
     const handleFixAll = async () => {
         if (problemsForActiveFile.length === 0) return;
@@ -110,6 +142,85 @@ export const TabbedOutputPanel: React.FC<TabbedOutputPanelProps> = ({
         }
     };
 
+    const renderContent = () => {
+        switch (activeTabId) {
+            case 'console':
+                return (
+                    <div className="h-full flex flex-col">
+                        <div ref={consoleLogContainerRef} className="flex-grow p-2 overflow-y-auto">
+                            {logs.map((log, index) => (
+                                <div key={index} className="whitespace-pre-wrap break-words break-all">
+                                    {log.startsWith('>') ? '' : '> '}{log}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex items-center p-2 border-t border-[#3a3d46] flex-shrink-0">
+                            <span className="mr-2 text-gray-500">&gt;</span>
+                            <input
+                                ref={consoleInputRef}
+                                type="text"
+                                value={command}
+                                onChange={e => setCommand(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Type command (e.g., pip install numpy)"
+                                className="w-full bg-transparent outline-none text-gray-300 placeholder-gray-500"
+                                spellCheck="false"
+                            />
+                        </div>
+                    </div>
+                );
+            case 'problems':
+                return (
+                     <div className="p-2 overflow-y-auto h-full">
+                        {problems.length > 0 
+                            ? (
+                                <div>
+                                    {problemsForActiveFile.length > 1 && (
+                                        <div className="mb-4 pb-2 border-b border-slate-700 font-sans">
+                                            <button
+                                                onClick={handleFixAll}
+                                                disabled={isFixingAll}
+                                                title={`Use Gemini to fix all errors in ${activeFileName}`}
+                                                className="px-2 py-1 text-xs bg-sky-800 hover:bg-sky-700 text-sky-200 rounded-md flex items-center space-x-1"
+                                            >
+                                                {isFixingAll ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <SparklesIcon className="w-4 h-4" />}
+                                                <span>{isFixingAll ? 'Fixing All...' : `✨ Fix All ${problemsForActiveFile.length} Problems in ${activeFileName}`}</span>
+                                            </button>
+                                            {fixAllError && <div className="mt-2 text-xs text-amber-500">{fixAllError}</div>}
+                                        </div>
+                                    )}
+                                    {problems.map((p, i) => {
+                                        const fileName = fileSystem[p.fileId]?.name || 'Unknown File';
+                                        return (
+                                            <div key={`${p.fileId}-${p.line}-${i}`} className="mb-2">
+                                                <div className="text-xs text-slate-400 mb-1 font-sans">{fileName}</div>
+                                                <div className="text-red-400 flex items-start">
+                                                    <span className="w-10 text-right pr-2 text-gray-500 flex-shrink-0 pt-0.5">{p.line}</span>
+                                                    <div className="flex-grow">
+                                                        <span className="pt-0.5 block whitespace-pre-wrap break-words break-all">{p.message}</span>
+                                                        <AIFixComponent problem={p} onApplyFix={onApplyFix} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )
+                            : <div>No problems detected.</div>
+                        }
+                    </div>
+                );
+            case 'guide':
+                return (
+                    <div className="overflow-y-auto h-full">
+                        <LanguageGuide activeLanguage={activeLanguage} />
+                    </div>
+                );
+            default:
+                return null;
+        }
+    }
+
     return (
         <div className="h-full bg-[#272a33] rounded-lg flex flex-col min-h-0 border border-[#3a3d46]">
             <div className="flex border-b border-[#3a3d46] text-gray-400 flex-shrink-0">
@@ -126,46 +237,8 @@ export const TabbedOutputPanel: React.FC<TabbedOutputPanelProps> = ({
                 </button>
             ))}
             </div>
-            <div className="flex-grow p-2 bg-[#1e2026] font-mono text-xs text-gray-400 overflow-y-auto">
-                {activeTabId === 'console' && logs.map((log, index) => <div key={index} className="whitespace-pre-wrap break-words break-all">{`> ${log}`}</div>)}
-                {activeTabId === 'problems' && (
-                    problems.length > 0 
-                        ? (
-                             <div>
-                                {problemsForActiveFile.length > 1 && (
-                                    <div className="mb-4 pb-2 border-b border-slate-700 font-sans">
-                                        <button
-                                            onClick={handleFixAll}
-                                            disabled={isFixingAll}
-                                            title={`Use Gemini to fix all errors in ${activeFileName}`}
-                                            className="px-2 py-1 text-xs bg-sky-800 hover:bg-sky-700 text-sky-200 rounded-md flex items-center space-x-1"
-                                        >
-                                            {isFixingAll ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <SparklesIcon className="w-4 h-4" />}
-                                            <span>{isFixingAll ? 'Fixing All...' : `✨ Fix All ${problemsForActiveFile.length} Problems in ${activeFileName}`}</span>
-                                        </button>
-                                        {fixAllError && <div className="mt-2 text-xs text-amber-500">{fixAllError}</div>}
-                                    </div>
-                                )}
-                                {problems.map((p, i) => {
-                                    const fileName = fileSystem[p.fileId]?.name || 'Unknown File';
-                                    return (
-                                        <div key={`${p.fileId}-${p.line}-${i}`} className="mb-2">
-                                             <div className="text-xs text-slate-400 mb-1 font-sans">{fileName}</div>
-                                            <div className="text-red-400 flex items-start">
-                                                <span className="w-10 text-right pr-2 text-gray-500 flex-shrink-0 pt-0.5">{p.line}</span>
-                                                <div className="flex-grow">
-                                                    <span className="pt-0.5 block whitespace-pre-wrap break-words break-all">{p.message}</span>
-                                                    <AIFixComponent problem={p} onApplyFix={onApplyFix} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        )
-                        : <div>No problems detected.</div>
-                )}
-                {activeTabId === 'guide' && <LanguageGuide activeLanguage={activeLanguage} />}
+            <div className="flex-grow bg-[#1e2026] font-mono text-xs text-gray-400 overflow-hidden">
+                {renderContent()}
             </div>
         </div>
     );
